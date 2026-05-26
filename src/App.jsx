@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from './supabase.js'
+import { supabase, envMissing } from './supabase.js'
 import { isPreviewMode, disablePreviewMode } from './previewStore.js'
 import { AppContext } from './AppContext.js'
 import Login from './screens/Login.jsx'
@@ -93,6 +93,26 @@ export default function App() {
     preview,
     testMode,
     localOnly
+  }
+
+  if (envMissing && !preview) {
+    return (
+      <div className="app-shell center-col">
+        <div className="card" style={{ maxWidth: 480, textAlign: 'center' }}>
+          <h2 style={{ fontSize: '1.4rem', marginBottom: 12 }}>
+            ⚠️ App not configured
+          </h2>
+          <p className="muted" style={{ marginBottom: 12 }}>
+            <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code>{' '}
+            are missing from this deployment's environment variables.
+          </p>
+          <p className="muted">
+            Add them in Vercel → Settings → Environment Variables, then
+            redeploy.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   if (!sessionLoaded) {
