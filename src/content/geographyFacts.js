@@ -1,5 +1,13 @@
 // Geography fact tables. Questions get generated from these via templates,
 // so adding a state or country to a list grows the question pool automatically.
+//
+// US_STATES must contain all 50 states — quizzes at 4th/5th grade pull from
+// the full list, so a silent deletion would create an unspottable coverage
+// gap. The length assertion below catches that at module load.
+//
+// Lower grades intentionally use subsets (SIMPLE_STATES, POPULAR_STATES in
+// geographyTemplates.js) — that's by design so a 1st grader isn't drilling
+// Wyoming's capital. Don't "fix" that by widening the lower-grade pools.
 
 export const US_STATES = [
   { name: 'Alabama', capital: 'Montgomery', region: 'South' },
@@ -53,6 +61,14 @@ export const US_STATES = [
   { name: 'Wisconsin', capital: 'Madison', region: 'Midwest' },
   { name: 'Wyoming', capital: 'Cheyenne', region: 'West' }
 ]
+
+// Build-time guard so a future edit can't silently drop a state.
+if (US_STATES.length !== 50) {
+  throw new Error(
+    `US_STATES must contain 50 states, found ${US_STATES.length}. ` +
+    `Geography quizzes at 4th/5th grade depend on full coverage.`
+  )
+}
 
 export const COUNTRIES = [
   { name: 'Canada', capital: 'Ottawa', continent: 'North America' },
