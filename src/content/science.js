@@ -252,3 +252,17 @@ export function generateScienceQuestions(grade, n = 10) {
 export function hasScience(grade) {
   return !!GRADE_BUILDERS[grade]?.length
 }
+
+// Distinct-question pool size for the Coverage % view in Progress.
+// Curated rows count exactly. Templated builders (animalKindQ etc.) are
+// approximated by their underlying fact-table sizes.
+const SCIENCE_POOL = {
+  '1st Grade': curated_1.length + BABY_NAMES.length + ANIMALS.length,
+  '2nd Grade': curated_2.length + BABY_NAMES.length + ANIMALS.length + LIFE_CYCLES.length,
+  '3rd Grade': curated_3.length + ANIMALS.length + POSITION_WORDS.length + MATTER_TRANSITIONS.length + BABY_NAMES.length,
+  '4th Grade': curated_4.length + ANIMALS.length + POSITION_WORDS.length + LIFE_CYCLES.length,
+  '5th Grade': curated_5.length + POSITION_WORDS.length + MATTER_TRANSITIONS.length
+}
+export function sciencePoolSize(grade) {
+  return SCIENCE_POOL[grade] || 0
+}

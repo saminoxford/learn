@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { useAppCtx } from '../AppContext.js'
 import XPBar from '../components/XPBar.jsx'
 import { listSessions as listPreviewSessions } from '../previewStore.js'
 import { gradeToNum } from '../content/minedVocab.js'
+import { poolSize, COVERAGE_SUBJECTS, GRADES } from '../content/index.js'
+import { fetchCoverageCounts } from '../content/questionHistory.js'
 
 // Compare a quiz's grade label ("3rd Grade") against the kid's current
 // profile grade_level. Powers the Stretch/Review badge on recent rows.
@@ -22,6 +24,7 @@ export default function Progress() {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
+  const [coverage, setCoverage] = useState([])
 
   useEffect(() => {
     let cancelled = false
@@ -50,6 +53,52 @@ export default function Progress() {
       cancelled = true
     }
   }, [activeProfile, localOnly])
+
+  // Coverage counts come from question_attempts. Preview mode has no DB
+  // history, so the cards just stay at 0/— in that case.
+  useEffect(() => {
+    if (localOnly || !activeProfile) return
+    let cancelled = false
+    fetchCoverageCounts(activeProfile.id)
+      .then((rows) => {
+        if (!cancelled) setCoverage(rows)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [activeProfile, localOnly])
+
+  // Roll the raw (subject, grade, seen) rows up into per-subject totals
+  // by summing seen across grades AND pool sizes across grades.
+  const coverageBySubject = useMemo(() => {
+    const seenMap = new Map()
+    for (const row of coverage) {
+      const k = row.subject
+      seenMap.set(k, (seenMap.get(k) || 0) + (row.seen || 0))
+    }
+    return COVERAGE_SUBJECTS.map((subject) => {
+      const seen = seenMap.get(subject) || 0
+      let pool = 0
+      for (const g of GRADES) {
+        const p = poolSize(subject, g)
+        if (typeof p === 'number') pool += p
+      }
+      return {
+        subject,
+        seen: Math.min(seen, pool), // cap at 100% if estimate is low
+        pool,
+        pct: pool > 0 ? Math.min(100, Math.round((seen / pool) * 100)) : 0
+      }
+    })
+  }, [coverage])
+
+  const overall = useMemo(() => {
+    const seen = coverageBySubject.reduce((n, r) => n + r.seen, 0)
+    const pool = coverageBySubject.reduce((n, r) => n + r.pool, 0)
+    const pct = pool > 0 ? Math.min(100, Math.round((seen / pool) * 100)) : 0
+    return { seen, pool, pct }
+  }, [coverageBySubject])
 
   const totals = sessions.reduce(
     (acc, s) => {
@@ -84,6 +133,42 @@ export default function Progress() {
           <XPBar xp={activeProfile.xp ?? 0} />
         </div>
       </div>
+
+      {!localOnly && overall.pool > 0 && (
+        <>
+          <div className="card" style={{ marginBottom: 20 }}>
+            <h2 style={{ fontSize: '1.2rem', marginBottom: 4 }}>Coverage</h2>
+            <p className="muted" style={{ marginBottom: 12 }}>
+              You've explored {overall.pct}% of available questions
+              ({overall.seen} / {overall.pool}).
+            </p>
+            <div className="coverage-bar">
+              <div className="coverage-fill" style={{ width: `${overall.pct}%` }} />
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 20 }}>
+            <h2 style={{ fontSize: '1.2rem', marginBottom: 12 }}>By subject (coverage)</h2>
+            {coverageBySubject
+              .slice()
+              .sort((a, b) => b.pct - a.pct)
+              .map((row) => (
+                <div key={row.subject} className="coverage-row">
+                  <strong style={{ minWidth: 110 }}>{row.subject}</strong>
+                  <div className="coverage-bar" style={{ flex: 1 }}>
+                    <div
+                      className="coverage-fill"
+                      style={{ width: `${row.pct}%` }}
+                    />
+                  </div>
+                  <span className="muted" style={{ minWidth: 90, textAlign: 'right' }}>
+                    {row.pool > 0 ? `${row.seen}/${row.pool} · ${row.pct}%` : '—'}
+                  </span>
+                </div>
+              ))}
+          </div>
+        </>
+      )}
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h2 style={{ fontSize: '1.2rem', marginBottom: 12 }}>By subject</h2>

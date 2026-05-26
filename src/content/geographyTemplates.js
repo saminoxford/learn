@@ -415,3 +415,32 @@ export function generateGeographyQuestions(grade, n = 10) {
 export function hasGeography(grade) {
   return !!GENERATORS[grade]?.length
 }
+
+// Distinct-question pool size for the Coverage % view in Progress.
+// Hand-tuned per grade — sums each builder's underlying cardinality
+// (state × question-direction, country, address part, etc.). These are
+// rough but stable; refine if a grade adds new builders.
+const GEO_POOL = {
+  '1st Grade': 6 + 4 + SIMPLE_STATES.length, // misc one-shots + compass + place-is-a samples
+  '2nd Grade': 6 + 4 + SIMPLE_STATES.length * 2 + COUNTRIES.length + 5,
+  '3rd Grade':
+    POPULAR_STATES.length * 2 + // stateCapitalQ + capitalStateQ
+    COUNTRIES.length * 2 +      // countryContinentQ + countryCapitalQ
+    POPULAR_STATES.length +     // regionQ
+    12 + 5 + 4 + 8 + 15 + 1 + 1, // compass + oceans + hierarchy + placeIsA + addressPart + misc
+  '4th Grade':
+    US_STATES.length * 2 +
+    COUNTRIES.length * 2 +
+    US_STATES.length +
+    LANDMARKS.length +
+    12 + 1 + 15 + 5 + 8 + 15 + 3,
+  '5th Grade':
+    US_STATES.length * 2 +
+    COUNTRIES.length * 2 +
+    US_STATES.length +
+    LANDMARKS.length +
+    12 + 1 + 5 + 8 + 15 + 3
+}
+export function geographyPoolSize(grade) {
+  return GEO_POOL[grade] || 0
+}

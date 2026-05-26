@@ -196,3 +196,14 @@ export function hasSpelling(grade) {
   // after vocab has been backfilled / generated; static is always present).
   return !!BUILDERS[grade]?.length && poolForGrade(grade).length > 0
 }
+
+// Coverage pool: distinct question_ids reachable from the static WORDS
+// table. Mined vocab is excluded because it grows daily — counting it
+// would make the denominator a moving target.
+export function spellingPoolSize(grade) {
+  const n = (WORDS[grade] || []).length
+  // 1st/2nd grade has one builder (which-is-spelled-correctly), 3rd+ adds
+  // the meaning-based MC, so distinct questions ≈ words × types.
+  const types = grade === '1st Grade' || grade === '2nd Grade' ? 1 : 2
+  return n * types
+}

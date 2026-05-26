@@ -3,11 +3,11 @@
 // and the anti-repeat windowing.
 
 import { generateMathQuestions, hasMath } from './mathGenerators.js'
-import { generateGeographyQuestions, hasGeography } from './geographyTemplates.js'
-import { generateScienceQuestions, hasScience } from './science.js'
-import { generateSpellingQuestions, hasSpelling } from './spellingGenerators.js'
-import { generateReadingQuestions, hasReading } from './readingGenerators.js'
-import { generateLifeSkillsQuestions, hasLifeSkills } from './lifeSkills.js'
+import { generateGeographyQuestions, hasGeography, geographyPoolSize } from './geographyTemplates.js'
+import { generateScienceQuestions, hasScience, sciencePoolSize } from './science.js'
+import { generateSpellingQuestions, hasSpelling, spellingPoolSize } from './spellingGenerators.js'
+import { generateReadingQuestions, hasReading, readingPoolSize } from './readingGenerators.js'
+import { generateLifeSkillsQuestions, hasLifeSkills, lifeSkillsPoolSize } from './lifeSkills.js'
 import { generateRandomQuestions, hasRandom } from './randomMixed.js'
 import { pickWithFrequencyBias } from './recent.js'
 
@@ -50,3 +50,22 @@ export function hasContent(subject, grade) {
 }
 
 export const SUBJECTS_AVAILABLE = Object.keys(GENERATE)
+
+// Coverage pool sizes per (subject, grade). Procedural subjects (Math,
+// Random, Did You Know?) and the synthetic Review subject return null —
+// those don't have a finite pool, so the UI shows them as "—".
+const POOL = {
+  Geography: geographyPoolSize,
+  Science: sciencePoolSize,
+  Spelling: spellingPoolSize,
+  Reading: readingPoolSize,
+  'Life Skills': lifeSkillsPoolSize
+}
+export function poolSize(subject, grade) {
+  const fn = POOL[subject]
+  return fn ? fn(grade) : null
+}
+
+// Subjects that show a coverage % bar in Progress. Order is the display order.
+export const COVERAGE_SUBJECTS = ['Spelling', 'Reading', 'Science', 'Geography', 'Life Skills']
+export const GRADES = ['1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade']

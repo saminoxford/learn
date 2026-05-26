@@ -69,3 +69,11 @@ export function hasLifeSkills(grade) {
   if (!buckets) return false
   return CATEGORIES.some((cat) => (buckets[cat] || []).length > 0)
 }
+
+// Distinct-question pool size for the Coverage % view in Progress.
+// Sums the curated questions across all 4 categories at this grade.
+export function lifeSkillsPoolSize(grade) {
+  const buckets = LIFESKILLS[grade]
+  if (!buckets) return 0
+  return CATEGORIES.reduce((n, cat) => n + (buckets[cat]?.length || 0), 0)
+}

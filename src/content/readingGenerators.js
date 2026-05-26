@@ -147,3 +147,12 @@ export function generateReadingQuestions(grade, n = 10) {
 export function hasReading(grade) {
   return !!BUILDERS[grade]?.length && poolForGrade(grade).length > 0
 }
+
+// Coverage pool: distinct questions reachable from the static WORDS table,
+// times the number of builders registered for this grade (one builder ≈
+// one distinct question per word). Mined vocab is excluded — see spelling.
+export function readingPoolSize(grade) {
+  const n = (WORDS[grade] || []).length
+  const builders = BUILDERS[grade]?.length || 0
+  return n * builders
+}
