@@ -107,7 +107,7 @@ export default function ProfileSelect() {
   return (
     <div className="app-shell">
       <div className="top-bar">
-        <div className="brand">🎓 Learn</div>
+        <div className="brand">🎓 Stubbs — Learn</div>
         <div className="row">
           {preview && <span className="preview-badge">Preview</span>}
           <button className="btn-ghost" onClick={logout}>
