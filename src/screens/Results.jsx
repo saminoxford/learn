@@ -2,17 +2,19 @@ import { useEffect } from 'react'
 import { useAppCtx } from '../AppContext.js'
 import Confetti from '../components/Confetti.jsx'
 
-function starsFor(score) {
-  if (score >= 9) return 3
-  if (score >= 7) return 2
-  if (score >= 4) return 1
+function starsFor(score, total) {
+  const pct = total > 0 ? score / total : 0
+  if (pct >= 0.9) return 3
+  if (pct >= 0.7) return 2
+  if (pct >= 0.4) return 1
   return 0
 }
 
-function messageFor(score) {
-  if (score === 10) return 'Perfect! 🔥 You aced it!'
-  if (score >= 8) return 'Awesome work! 🌟'
-  if (score >= 5) return 'Nice effort — keep going! 💪'
+function messageFor(score, total) {
+  const pct = total > 0 ? score / total : 0
+  if (pct === 1) return 'Perfect! 🔥 You aced it!'
+  if (pct >= 0.8) return 'Awesome work! 🌟'
+  if (pct >= 0.5) return 'Nice effort — keep going! 💪'
   return 'Good try! Practice makes perfect. 🌱'
 }
 
@@ -42,24 +44,28 @@ function celebrationSound() {
   }
 }
 
-export default function Results({ subject, grade, score, xpEarned }) {
+export default function Results({ subject, grade, score, total, xpEarned }) {
   const { setRoute } = useAppCtx()
-  const stars = starsFor(score)
-  const perfect = score === 10
+  const stars = starsFor(score, total)
+  const perfect = total > 0 && score === total
 
   useEffect(() => {
     if (perfect) celebrationSound()
   }, [perfect])
 
+  const isDYK = subject === 'Did You Know?'
+
   return (
     <div className="app-shell center-col">
       {perfect && <Confetti />}
       <div className="card pop-in" style={{ maxWidth: 460, width: '100%', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '3rem', marginBottom: 4 }}>{score} / 10</h1>
+        <h1 style={{ fontSize: '3rem', marginBottom: 4 }}>
+          {score} / {total}
+        </h1>
         <div style={{ fontSize: '2.6rem', letterSpacing: 8 }}>
           {'⭐'.repeat(stars)}{'☆'.repeat(3 - stars)}
         </div>
-        <p style={{ marginTop: 14, fontSize: '1.15rem' }}>{messageFor(score)}</p>
+        <p style={{ marginTop: 14, fontSize: '1.15rem' }}>{messageFor(score, total)}</p>
         <p className="muted" style={{ marginTop: 8 }}>
           +{xpEarned} XP earned
         </p>
@@ -74,9 +80,15 @@ export default function Results({ subject, grade, score, xpEarned }) {
         >
           <button
             className="btn-primary"
-            onClick={() => setRoute({ name: 'quiz', subject, grade })}
+            onClick={() =>
+              setRoute(
+                isDYK
+                  ? { name: 'article' }
+                  : { name: 'quiz', subject, grade }
+              )
+            }
           >
-            Play again
+            {isDYK ? 'Next article' : 'Play again'}
           </button>
           <button className="btn-ghost" onClick={() => setRoute({ name: 'home' })}>
             Home

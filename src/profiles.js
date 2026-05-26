@@ -62,7 +62,8 @@ export function expectedProfileForSession(session) {
   const name = (md.display_name || nameFromEmail(session.user.email) || '').trim()
   if (!name) return null
   const avatar = md.avatar || AVATAR_OVERRIDES[name] || FALLBACK_AVATAR
-  return { name, avatar }
+  const readingLevel = Number(md.reading_level) || 3
+  return { name, avatar, reading_level: readingLevel }
 }
 
 // Cosmetic-only: always render the override avatar if one exists for that

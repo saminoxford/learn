@@ -4,10 +4,21 @@ import { useAppCtx } from '../AppContext.js'
 import { updateProfile as updatePreviewProfile } from '../previewStore.js'
 import { AVATAR_OPTIONS, FALLBACK_AVATAR } from '../profiles.js'
 
+const READING_LEVELS = [
+  { value: 1, label: '1st' },
+  { value: 2, label: '2nd' },
+  { value: 3, label: '3rd' },
+  { value: 4, label: '4th' },
+  { value: 5, label: '5th' }
+]
+
 export default function EditProfile({ onClose }) {
   const { activeProfile, updateActiveProfile, localOnly, isKidAccount } = useAppCtx()
   const [name, setName] = useState(activeProfile.name || '')
   const [avatar, setAvatar] = useState(activeProfile.avatar || FALLBACK_AVATAR)
+  const [readingLevel, setReadingLevel] = useState(
+    Number(activeProfile.reading_level) || 3
+  )
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -22,24 +33,37 @@ export default function EditProfile({ onClose }) {
 
     try {
       if (localOnly) {
-        updatePreviewProfile(activeProfile.id, { name: cleaned, avatar })
+        updatePreviewProfile(activeProfile.id, {
+          name: cleaned,
+          avatar,
+          reading_level: readingLevel
+        })
       } else {
         const { error } = await supabase
           .from('profiles')
-          .update({ name: cleaned, avatar })
+          .update({
+            name: cleaned,
+            avatar,
+            reading_level: readingLevel
+          })
           .eq('id', activeProfile.id)
         if (error) throw error
 
-        // For real kid accounts, sync to the auth user record so the
-        // Supabase dashboard's Display name column reflects the change.
-        // Admins editing their own simulated copies don't touch user_metadata.
         if (isKidAccount) {
           await supabase.auth.updateUser({
-            data: { display_name: cleaned, avatar }
+            data: {
+              display_name: cleaned,
+              avatar,
+              reading_level: readingLevel
+            }
           })
         }
       }
-      updateActiveProfile({ name: cleaned, avatar })
+      updateActiveProfile({
+        name: cleaned,
+        avatar,
+        reading_level: readingLevel
+      })
       onClose()
     } catch (e) {
       setErr(e.message || 'Save failed.')
@@ -63,7 +87,7 @@ export default function EditProfile({ onClose }) {
         />
 
         <label className="muted" style={{ fontSize: '0.85rem' }}>Avatar</label>
-        <div className="avatar-grid" style={{ marginTop: 8 }}>
+        <div className="avatar-grid" style={{ marginTop: 8, marginBottom: 18 }}>
           {AVATAR_OPTIONS.map((opt) => (
             <button
               key={opt}
@@ -73,6 +97,23 @@ export default function EditProfile({ onClose }) {
               aria-label={`Choose ${opt}`}
             >
               {opt}
+            </button>
+          ))}
+        </div>
+
+        <label className="muted" style={{ fontSize: '0.85rem' }}>
+          Reading level (for Did You Know?)
+        </label>
+        <div className="reading-level-row" style={{ marginTop: 8 }}>
+          {READING_LEVELS.map((rl) => (
+            <button
+              key={rl.value}
+              type="button"
+              className={`reading-pill ${rl.value === readingLevel ? 'selected' : ''}`}
+              onClick={() => setReadingLevel(rl.value)}
+              aria-label={`Reading level ${rl.label}`}
+            >
+              {rl.label}
             </button>
           ))}
         </div>

@@ -12,7 +12,9 @@ const SUBJECTS = [
   { key: 'Spelling', emoji: '🔤', tone: 'spelling' },
   { key: 'Reading', emoji: '📚', tone: 'reading' },
   { key: 'Life Skills', emoji: '🧰', tone: 'lifeskills' },
-  { key: 'Random', emoji: '🎲', tone: 'random' }
+  { key: 'Random', emoji: '🎲', tone: 'random' },
+  // Did You Know? skips the grade picker — uses profile.reading_level instead
+  { key: 'Did You Know?', emoji: '📰', tone: 'didyouknow', skipsGrade: true }
 ]
 
 export default function Home() {
@@ -114,7 +116,13 @@ export default function Home() {
             <button
               key={s.key}
               className={`tile ${s.tone}`}
-              onClick={() => setRoute({ name: 'grade', subject: s.key })}
+              onClick={() =>
+                setRoute(
+                  s.skipsGrade
+                    ? { name: 'article', subject: s.key }
+                    : { name: 'grade', subject: s.key }
+                )
+              }
             >
               <div className="emoji">{s.emoji}</div>
               <h2>{s.key}</h2>

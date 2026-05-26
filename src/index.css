@@ -11,6 +11,7 @@
   --accent-spelling: #fbbf24;
   --accent-reading: #c084fc;
   --accent-lifeskills: #fb923c;
+  --accent-didyouknow: #818cf8;
 
   font-family: 'Nunito', system-ui, sans-serif;
   color: var(--text);
@@ -228,6 +229,71 @@ input:focus {
 .tile.random:hover {
   border-color: #ec4899;
   box-shadow: 0 18px 40px rgba(236, 72, 153, 0.3);
+}
+.tile.didyouknow:hover {
+  border-color: #818cf8;
+  box-shadow: 0 18px 40px rgba(129, 140, 248, 0.3);
+}
+
+/* Did You Know? article reading typography */
+.article-card {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 28px 32px;
+}
+.article-title {
+  font-family: 'Fredoka One', 'Nunito', sans-serif;
+  font-size: 1.9rem;
+  line-height: 1.15;
+  letter-spacing: 0.5px;
+  margin-bottom: 18px;
+  text-align: center;
+}
+.article-body {
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.92);
+}
+.article-body p {
+  margin: 0 0 14px;
+}
+.article-body p:last-child {
+  margin-bottom: 0;
+}
+@media (max-width: 600px) {
+  .article-title {
+    font-size: 1.5rem;
+  }
+  .article-body {
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+}
+
+/* Reading-level pill row in EditProfile */
+.reading-level-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.reading-pill {
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid var(--card-border);
+  border-radius: 12px;
+  padding: 10px 0;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: white;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.reading-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+.reading-pill.selected {
+  background: rgba(129, 140, 248, 0.2);
+  border-color: #818cf8;
 }
 
 .grade-grid {

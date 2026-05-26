@@ -61,7 +61,8 @@ export default function ProfileSelect() {
               owner_id: userId,
               name: expected.name,
               avatar: expected.avatar,
-              xp: 0
+              xp: 0,
+              reading_level: expected.reading_level ?? 3
             })
             .select()
             .single()

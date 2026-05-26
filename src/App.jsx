@@ -9,6 +9,7 @@ import GradeSelect from './screens/GradeSelect.jsx'
 import Quiz from './screens/Quiz.jsx'
 import Results from './screens/Results.jsx'
 import Progress from './screens/Progress.jsx'
+import Article from './screens/Article.jsx'
 
 const PREVIEW_SESSION = { user: { id: 'preview-user', email: 'preview@local' } }
 
@@ -140,12 +141,16 @@ export default function App() {
             subject={route.subject}
             grade={route.grade}
             score={route.score}
+            total={route.total ?? 10}
             xpEarned={route.xpEarned}
           />
         )
         break
       case 'progress':
         screen = <Progress />
+        break
+      case 'article':
+        screen = <Article />
         break
       default:
         screen = <Home />

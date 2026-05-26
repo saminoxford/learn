@@ -5,6 +5,7 @@ import { getQuestions } from '../content/index.js'
 import { recordSession, updateProfile } from '../previewStore.js'
 import FillAnswer from '../components/FillAnswer.jsx'
 import OrderAnswer from '../components/OrderAnswer.jsx'
+import ChoiceAnswer from '../components/ChoiceAnswer.jsx'
 import { normalizeFill } from '../components/fillCompare.js'
 import { compareOrder } from '../components/orderCompare.js'
 
@@ -183,6 +184,7 @@ export default function Quiz({ subject, grade }) {
         subject,
         grade,
         score,
+        total: questions.length,
         xpEarned
       })
     }
@@ -237,28 +239,13 @@ export default function Quiz({ subject, grade }) {
           hint={q.hint}
         />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {q.options.map((opt, i) => {
-            let cls = 'option-btn'
-            if (checked) {
-              if (opt === q.answer) cls += ' correct'
-              else if (opt === selected) cls += ' wrong'
-            } else if (opt === selected) {
-              cls += ' selected'
-            }
-            return (
-              <button
-                key={opt}
-                className={cls}
-                disabled={checked}
-                onClick={() => setSelected(opt)}
-              >
-                <span className="option-num">{i + 1}</span>
-                <span className="option-text">{opt}</span>
-              </button>
-            )
-          })}
-        </div>
+        <ChoiceAnswer
+          options={q.options}
+          selected={selected}
+          onSelect={setSelected}
+          checked={checked}
+          correctAnswer={q.answer}
+        />
       )}
 
       <div style={{ marginTop: 24, display: 'flex', justifyContent: 'center' }}>
