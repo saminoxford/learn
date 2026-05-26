@@ -10,7 +10,8 @@ const SUBJECTS = [
   { key: 'Science', emoji: '🔬', tone: 'science' },
   { key: 'Geography', emoji: '🌎', tone: 'geography' },
   { key: 'Spelling', emoji: '🔤', tone: 'spelling' },
-  { key: 'Reading', emoji: '📚', tone: 'reading' }
+  { key: 'Reading', emoji: '📚', tone: 'reading' },
+  { key: 'Life Skills', emoji: '🧰', tone: 'lifeskills' }
 ]
 
 export default function Home() {

@@ -7,16 +7,18 @@ import { generateGeographyQuestions, hasGeography } from './geographyTemplates.j
 import { generateScienceQuestions, hasScience } from './science.js'
 import { generateSpellingQuestions, hasSpelling } from './spellingGenerators.js'
 import { generateReadingQuestions, hasReading } from './readingGenerators.js'
+import { generateLifeSkillsQuestions, hasLifeSkills } from './lifeSkills.js'
 import { pickWithRecentMemory } from './recent.js'
 
 // Each generator returns an array of question objects shaped like
-//   { type: 'choice' | 'fill', question, ... }
+//   { type: 'choice' | 'fill' | 'order', question, ... }
 const GENERATE = {
   Math: generateMathQuestions,
   Geography: generateGeographyQuestions,
   Science: generateScienceQuestions,
   Spelling: generateSpellingQuestions,
-  Reading: generateReadingQuestions
+  Reading: generateReadingQuestions,
+  'Life Skills': generateLifeSkillsQuestions
 }
 
 const HAS = {
@@ -24,7 +26,8 @@ const HAS = {
   Geography: hasGeography,
   Science: hasScience,
   Spelling: hasSpelling,
-  Reading: hasReading
+  Reading: hasReading,
+  'Life Skills': hasLifeSkills
 }
 
 // Returns the next quiz's questions for this profile × subject × grade,

@@ -10,6 +10,7 @@
   --accent-geography: #93c5fd;
   --accent-spelling: #fbbf24;
   --accent-reading: #c084fc;
+  --accent-lifeskills: #fb923c;
 
   font-family: 'Nunito', system-ui, sans-serif;
   color: var(--text);
@@ -220,6 +221,10 @@ input:focus {
   border-color: #c084fc;
   box-shadow: 0 18px 40px rgba(192, 132, 252, 0.25);
 }
+.tile.lifeskills:hover {
+  border-color: #fb923c;
+  box-shadow: 0 18px 40px rgba(251, 146, 60, 0.25);
+}
 
 .grade-grid {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -339,6 +344,110 @@ input:focus {
   height: 100%;
   background: linear-gradient(90deg, #fbbf24, #f472b6, #a855f7);
   transition: width 0.3s ease;
+}
+
+/* Order-question UI (Life Skills procedural sequencing) */
+.order-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.order-pool-label,
+.order-slots-label {
+  font-size: 0.85rem;
+}
+.order-pool {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px dashed var(--card-border);
+  border-radius: 16px;
+  min-height: 52px;
+}
+.order-chip {
+  background: rgba(168, 85, 247, 0.18);
+  border: 2px solid rgba(168, 85, 247, 0.45);
+  color: white;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease, opacity 0.2s ease;
+  text-align: left;
+  max-width: 100%;
+}
+.order-chip:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.28);
+  transform: translateY(-1px);
+}
+.order-chip.used {
+  opacity: 0.25;
+  cursor: default;
+}
+.order-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.order-slot {
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid var(--card-border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.order-slot.filled {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.order-slot.correct {
+  background: rgba(52, 211, 153, 0.22);
+  border-color: #34d399;
+  cursor: default;
+}
+.order-slot.wrong {
+  background: rgba(248, 113, 113, 0.22);
+  border-color: #f87171;
+  cursor: default;
+}
+.order-slot-num {
+  flex-shrink: 0;
+  min-width: 26px;
+  font-family: 'Fredoka One', sans-serif;
+  color: rgba(255, 255, 255, 0.7);
+}
+.order-slot-text {
+  flex: 1;
+}
+.order-correct {
+  width: 100%;
+  max-width: 520px;
+  margin: 4px 0 0;
+  padding-left: 20px;
+  text-align: left;
+  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 14px 14px 14px 36px;
+  list-style-position: outside;
+}
+.order-correct li {
+  margin: 4px 0;
 }
 
 .fill-wrap {

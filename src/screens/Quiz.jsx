@@ -4,7 +4,9 @@ import { useAppCtx } from '../AppContext.js'
 import { getQuestions } from '../content/index.js'
 import { recordSession, updateProfile } from '../previewStore.js'
 import FillAnswer from '../components/FillAnswer.jsx'
+import OrderAnswer from '../components/OrderAnswer.jsx'
 import { normalizeFill } from '../components/fillCompare.js'
+import { compareOrder } from '../components/orderCompare.js'
 
 const TOTAL = 10
 
@@ -46,6 +48,7 @@ export default function Quiz({ subject, grade }) {
   const [idx, setIdx] = useState(0)
   const [selected, setSelected] = useState(null) // for 'choice'
   const [typed, setTyped] = useState('') // for 'fill'
+  const [arrangement, setArrangement] = useState(null) // for 'order' (array of step indexes)
   const [checked, setChecked] = useState(false)
   const [score, setScore] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -54,13 +57,33 @@ export default function Quiz({ subject, grade }) {
   const q = questions[idx]
   const isLast = idx === questions.length - 1
   const isFill = q?.type === 'fill'
+  const isOrder = q?.type === 'order'
 
-  // For fill, "selected" is the typed value. Match comparison is normalized.
+  // Lazily initialize the arrangement when the current question is 'order'
+  const slots =
+    isOrder
+      ? arrangement && arrangement.length === q.steps.length
+        ? arrangement
+        : new Array(q.steps.length).fill(undefined)
+      : null
+
+  // For order, "correct order" is the identity array [0,1,2,...] because
+  // q.steps is already stored in canonical order. User picks indexes.
+  const correctOrder = isOrder ? q.steps.map((_, i) => i) : null
+  const orderResult =
+    isOrder && slots ? compareOrder(slots, correctOrder) : null
+
   const isCorrect = isFill
     ? normalizeFill(typed) === normalizeFill(q?.answer)
-    : selected === q?.answer
+    : isOrder
+      ? !!orderResult?.allCorrect
+      : selected === q?.answer
 
-  const hasAnswer = isFill ? typed.trim().length > 0 : selected != null
+  const hasAnswer = isFill
+    ? typed.trim().length > 0
+    : isOrder
+      ? slots && slots.every((v) => v !== undefined)
+      : selected != null
 
   // keyboard shortcuts: digits select choices, Enter advances
   useEffect(() => {
@@ -69,7 +92,6 @@ export default function Quiz({ subject, grade }) {
       const cur = questions[idx]
       if (!cur) return
       if (e.key === 'Enter') {
-        // Don't let Enter inside the input bubble up before the user typed something
         if (isFill && !hasAnswer && !checked) return
         const btn = document.getElementById('quiz-primary-btn')
         if (btn && !btn.disabled) btn.click()
@@ -107,7 +129,9 @@ export default function Quiz({ subject, grade }) {
     setChecked(true)
     const right = isFill
       ? normalizeFill(typed) === normalizeFill(q.answer)
-      : selected === q.answer
+      : isOrder
+        ? !!orderResult?.allCorrect
+        : selected === q.answer
     if (right) setScore((s) => s + 1)
     chime(right)
   }
@@ -117,6 +141,7 @@ export default function Quiz({ subject, grade }) {
       setIdx((i) => i + 1)
       setSelected(null)
       setTyped('')
+      setArrangement(null)
       setChecked(false)
       return
     }
@@ -194,7 +219,16 @@ export default function Quiz({ subject, grade }) {
         </h2>
       </div>
 
-      {isFill ? (
+      {isOrder ? (
+        <OrderAnswer
+          steps={q.steps}
+          shuffleSeed={idx + 1}
+          value={slots}
+          onChange={setArrangement}
+          checked={checked}
+          perSlot={orderResult?.perSlot}
+        />
+      ) : isFill ? (
         <FillAnswer
           value={typed}
           onChange={setTyped}
@@ -238,10 +272,21 @@ export default function Quiz({ subject, grade }) {
             Check answer
           </button>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-            <div style={{ fontSize: '1.15rem' }}>
-              {isCorrect ? '✅ Correct!' : `❌ Answer: ${q.answer}`}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, width: '100%' }}>
+            <div style={{ fontSize: '1.15rem', textAlign: 'center' }}>
+              {isCorrect
+                ? '✅ Correct!'
+                : isOrder
+                  ? '❌ Not quite — the right order was:'
+                  : `❌ Answer: ${q.answer}`}
             </div>
+            {!isCorrect && isOrder && (
+              <ol className="order-correct">
+                {q.steps.map((s) => (
+                  <li key={s}>{s}</li>
+                ))}
+              </ol>
+            )}
             <button
               id="quiz-primary-btn"
               className="btn-primary"
