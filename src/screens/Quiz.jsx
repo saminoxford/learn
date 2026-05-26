@@ -2,13 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { useAppCtx } from '../AppContext.js'
 import { getQuestions } from '../content/index.js'
-import { fetchMinedVocab, gradeToNum } from '../content/minedVocab.js'
+import { fetchMinedVocab, gradeToNum, setActiveTopic, getCachedMinedVocab } from '../content/minedVocab.js'
 import { recordSession, updateProfile } from '../previewStore.js'
 import FillAnswer from '../components/FillAnswer.jsx'
 import OrderAnswer from '../components/OrderAnswer.jsx'
 import ChoiceAnswer from '../components/ChoiceAnswer.jsx'
+import TopicChipBar from '../components/TopicChipBar.jsx'
 import { normalizeFill } from '../components/fillCompare.js'
 import { compareOrder } from '../components/orderCompare.js'
+
+const TOPIC_FILTERED_SUBJECTS = new Set(['Spelling', 'Reading'])
 
 const TOTAL = 10
 
@@ -43,15 +46,28 @@ function chime(correct) {
 export default function Quiz({ subject, grade }) {
   const { activeProfile, setRoute, updateActiveProfile, localOnly } = useAppCtx()
 
+  // Per-quiz topic override. Defaults to the profile's pinned topic_filter;
+  // the kid can swap it via TopicChipBar before the first answer. Only
+  // applies to Spelling/Reading; ignored for everything else.
+  const profileTopic = activeProfile?.topic_filter || null
+  const [topic, setTopic] = useState(
+    TOPIC_FILTERED_SUBJECTS.has(subject) ? profileTopic : null
+  )
+
   // Pre-warm the mined-vocab cache before generating questions so the
   // Spelling/Reading generators see the merged pool. Other subjects pay
   // the same ~50ms one-time fetch but ignore the cache. Skipped in
   // preview/test mode where Supabase isn't hit.
   const [vocabReady, setVocabReady] = useState(localOnly)
   useEffect(() => {
-    if (localOnly) return
+    if (localOnly) {
+      setActiveTopic(null)
+      return
+    }
     let cancelled = false
-    fetchMinedVocab(gradeToNum(grade))
+    setVocabReady(false)
+    setActiveTopic(topic)
+    fetchMinedVocab(gradeToNum(grade), topic)
       .catch(() => {})
       .finally(() => {
         if (!cancelled) setVocabReady(true)
@@ -59,12 +75,27 @@ export default function Quiz({ subject, grade }) {
     return () => {
       cancelled = true
     }
-  }, [grade, localOnly])
+  }, [grade, localOnly, topic])
+
+  // Clear the module-level active topic on unmount so other parts of the
+  // app aren't accidentally filtered.
+  useEffect(() => () => setActiveTopic(null), [])
 
   const questions = useMemo(
     () => (vocabReady ? getQuestions(activeProfile.id, subject, grade, TOTAL) : []),
-    [activeProfile.id, subject, grade, vocabReady]
+    [activeProfile.id, subject, grade, vocabReady, topic]
   )
+
+  const showTopicBar =
+    !localOnly && TOPIC_FILTERED_SUBJECTS.has(subject)
+  // When the topic filter yields zero mined entries we still ship a quiz
+  // off the static Dolch/Fry wordlist — show a muted notice so the kid
+  // knows why the questions don't feel topical.
+  const minedFallback =
+    showTopicBar &&
+    topic &&
+    vocabReady &&
+    getCachedMinedVocab(gradeToNum(grade), topic).length === 0
 
   const [idx, setIdx] = useState(0)
   const [selected, setSelected] = useState(null) // for 'choice'
@@ -240,6 +271,15 @@ export default function Quiz({ subject, grade }) {
         <div className="progress-fill" style={{ width: `${progress}%` }} />
       </div>
 
+      {showTopicBar && (
+        <TopicChipBar
+          value={topic}
+          onChange={setTopic}
+          disabled={idx > 0 || checked}
+          fallbackNotice={minedFallback}
+        />
+      )}
+
       <div key={`q-${idx}`} className="card fade-in" style={{ marginBottom: 20 }}>
         <div style={{ fontSize: '3.4rem', textAlign: 'center', lineHeight: 1 }}>
           {q.emoji}
@@ -247,6 +287,9 @@ export default function Quiz({ subject, grade }) {
         <h2 style={{ textAlign: 'center', marginTop: 14, fontSize: '1.5rem' }}>
           {q.question}
         </h2>
+        {subject === 'Spelling' && (
+          <p className="quiz-hint">💡 Hint: Pay close attention to spelling.</p>
+        )}
       </div>
 
       {isOrder ? (

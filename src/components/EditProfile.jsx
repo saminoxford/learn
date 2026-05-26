@@ -3,6 +3,7 @@ import { supabase } from '../supabase.js'
 import { useAppCtx } from '../AppContext.js'
 import { updateProfile as updatePreviewProfile } from '../previewStore.js'
 import { AVATAR_OPTIONS, FALLBACK_AVATAR } from '../profiles.js'
+import { TOPICS } from '../content/topics.js'
 
 const READING_LEVELS = [
   { value: 1, label: '1st' },
@@ -22,6 +23,7 @@ export default function EditProfile({ onClose }) {
   const [gradeLevel, setGradeLevel] = useState(
     Number(activeProfile.grade_level) || 3
   )
+  const [topicFilter, setTopicFilter] = useState(activeProfile.topic_filter || '')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -34,13 +36,16 @@ export default function EditProfile({ onClose }) {
     setSaving(true)
     setErr('')
 
+    const topicValue = topicFilter || null
+
     try {
       if (localOnly) {
         updatePreviewProfile(activeProfile.id, {
           name: cleaned,
           avatar,
           reading_level: readingLevel,
-          grade_level: gradeLevel
+          grade_level: gradeLevel,
+          topic_filter: topicValue
         })
       } else {
         const { error } = await supabase
@@ -49,7 +54,8 @@ export default function EditProfile({ onClose }) {
             name: cleaned,
             avatar,
             reading_level: readingLevel,
-            grade_level: gradeLevel
+            grade_level: gradeLevel,
+            topic_filter: topicValue
           })
           .eq('id', activeProfile.id)
         if (error) throw error
@@ -69,7 +75,8 @@ export default function EditProfile({ onClose }) {
         name: cleaned,
         avatar,
         reading_level: readingLevel,
-        grade_level: gradeLevel
+        grade_level: gradeLevel,
+        topic_filter: topicValue
       })
       onClose()
     } catch (e) {
@@ -141,6 +148,25 @@ export default function EditProfile({ onClose }) {
             </button>
           ))}
         </div>
+
+        <label
+          className="muted"
+          style={{ fontSize: '0.85rem', marginTop: 18, display: 'block' }}
+        >
+          Topic of the week (Spelling &amp; Reading)
+        </label>
+        <select
+          value={topicFilter}
+          onChange={(e) => setTopicFilter(e.target.value)}
+          style={{ width: '100%', marginTop: 8 }}
+        >
+          <option value="">Any topic (default)</option>
+          {TOPICS.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.emoji} {t.label}
+            </option>
+          ))}
+        </select>
 
         {err && <div className="error" style={{ marginTop: 12 }}>{err}</div>}
 
