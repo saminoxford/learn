@@ -88,3 +88,16 @@ Each article is ~1500 input + ~800 output tokens. 10 articles/day:
 - See logs: Supabase dashboard → Edge Functions → generate-articles → Logs
 - Trigger manually: dashboard → Invoke, or `curl` from step 5 above
 - Disable cron temporarily: `select cron.unschedule('generate-articles-daily');`
+
+## Backfill modes
+
+The function has three modes, selected by query string:
+
+| URL                                  | What it does                                          |
+| ------------------------------------ | ----------------------------------------------------- |
+| `/generate-articles`                 | Generates ~10 fresh articles (default cron call).     |
+| `/generate-articles?backfill=true`   | Fills missing `vocab` arrays on existing articles.    |
+| `/generate-articles?backfill_tags=true` | Fills missing `tags` arrays on existing articles.  |
+
+Run backfills manually from the dashboard or via `curl`; they're idempotent
+and only touch rows where the column is empty/null.

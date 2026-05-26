@@ -1,11 +1,14 @@
 // Supabase Edge Function: generate-articles
 //
-// Two modes:
+// Three modes:
 //   Default (POST without args): generate ~10 fresh "Did You Know?"
 //     articles via Claude Haiku and insert into the `articles` table.
-//   Backfill (POST ?backfill=true): for each article whose `vocab`
-//     column is still empty, call Claude with the existing body to
-//     extract 3-5 vocabulary words and update the row.
+//   Vocab backfill (POST ?backfill=true): for each article whose
+//     `vocab` column is still empty, call Claude with the existing
+//     body to extract 3-5 vocabulary words and update the row.
+//   Tags backfill (POST ?backfill_tags=true): for each article whose
+//     `tags` is empty/null, derive 2-3 lowercase topic tags from the
+//     body and update the row.
 //
 // Tolerates a missing ANTHROPIC_API_KEY — logs and no-ops so the app
 // keeps working off the seed content.
@@ -36,7 +39,7 @@ function buildArticlePrompt(readingLevel: number, topic: string) {
 
 Topic: ${topic}
 
-Pick ONE fascinating, surprising, age-appropriate fact about ${topic} that most kids would not know. Write 3-4 paragraphs separated by blank lines. Then write exactly 2 multiple-choice comprehension questions about the article. Then extract 3-5 vocabulary words from the article body. Each must have exactly 4 options and one correct answer for questions.
+Pick ONE fascinating, surprising, age-appropriate fact about ${topic} that most kids would not know. Write 3-4 paragraphs separated by blank lines. Then write exactly 2 multiple-choice comprehension questions about the article. Then extract 3-5 vocabulary words from the article body. Then provide 2-3 short topic tags. Each question must have exactly 4 options and one correct answer.
 
 Vocabulary rules:
 - Choose MEANINGFUL nouns, verbs, or adjectives that appear in the article body.
@@ -44,11 +47,16 @@ Vocabulary rules:
 - Prefer words that build the kid's vocabulary — interesting words tied to the topic, not common kid words.
 - For each word, give: lowercase form, kid-friendly definition, part of speech ("noun"|"verb"|"adjective"), a single best-fit emoji (use "📖" if nothing obvious), and an optional antonyms array (1-2 opposite words, or empty array).
 
+Tag rules:
+- 2-3 lowercase single-word tags. First MUST be "${topic}". Others are specific subtopics from the article body (e.g. "mars", "rovers", "bees", "honey").
+- No spaces, no punctuation, no duplicates.
+
 Output STRICT JSON with no preamble or markdown fences:
 {
   "title": "Short hook-y title (under 70 chars)",
   "body": "3-4 paragraphs separated by blank lines",
   "topic": "${topic}",
+  "tags": ["${topic}", "subtopic1", "subtopic2"],
   "questions": [
     { "question": "...?", "options": ["A", "B", "C", "D"], "answer": "B" },
     { "question": "...?", "options": ["A", "B", "C", "D"], "answer": "A" }
@@ -63,6 +71,22 @@ Rules:
 - Family-friendly only. No violence, scary content, politics, religion.
 - Facts must be true and verifiable.
 - Each "answer" string must appear EXACTLY in the matching "options" array.`
+}
+
+function buildTagsBackfillPrompt(title: string, body: string, topic: string) {
+  return `Given this kids' "Did You Know?" article, produce 2-3 short topic tags.
+
+TITLE: ${title}
+TOPIC: ${topic}
+ARTICLE:
+${body}
+
+Tag rules:
+- 2-3 lowercase single-word tags. First MUST be "${topic}". Others are specific subtopics from the body (e.g. "mars", "rovers", "bees", "honey", "ancient").
+- No spaces, no punctuation, no duplicates.
+
+Output STRICT JSON, nothing else:
+{ "tags": ["${topic}", "subtopic1", "subtopic2"] }`
 }
 
 function buildBackfillPrompt(body: string, readingLevel: number) {
@@ -127,6 +151,34 @@ function isValidVocab(vocab: unknown): vocab is any[] {
   )
 }
 
+// Tags must be 2-5 short single-word lowercase strings, deduped. The caller
+// passes the article's topic so we can guarantee it appears as tags[0].
+function normalizeTags(raw: unknown, topic: string): string[] {
+  const fallback = [topic.toLowerCase()]
+  if (!Array.isArray(raw)) return fallback
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const t of raw) {
+    if (typeof t !== 'string') continue
+    const norm = t.toLowerCase().trim()
+    if (!norm || norm.length > 24) continue
+    if (/[\s\W]/.test(norm)) continue // single-word only
+    if (seen.has(norm)) continue
+    seen.add(norm)
+    out.push(norm)
+    if (out.length >= 5) break
+  }
+  if (out.length === 0) return fallback
+  // Guarantee topic-first.
+  const topicNorm = topic.toLowerCase().trim()
+  if (out[0] !== topicNorm) {
+    const i = out.indexOf(topicNorm)
+    if (i > 0) out.splice(i, 1)
+    out.unshift(topicNorm)
+  }
+  return out.slice(0, 5)
+}
+
 function validateArticle(parsed: any) {
   if (!parsed.title || !parsed.body || !Array.isArray(parsed.questions)) {
     throw new Error('Generated article missing required fields')
@@ -160,15 +212,16 @@ async function generateMode(apiKey: string, supabase: any) {
       try {
         const article = await callClaude(apiKey, buildArticlePrompt(level, topic))
         validateArticle(article)
+        const articleTopic = article.topic || topic
         const { error } = await supabase.from('articles').insert({
           reading_level: level,
           title: article.title,
           body: article.body,
           questions: article.questions,
           vocab: article.vocab || [],
-          topic: article.topic || topic,
+          topic: articleTopic,
           source: 'claude-api',
-          tags: []
+          tags: normalizeTags(article.tags, articleTopic)
         })
         if (error) throw error
         results.push({ level, ok: true, title: article.title })
@@ -235,6 +288,61 @@ async function backfillMode(apiKey: string, supabase: any) {
   }
 }
 
+// ---- Mode: backfill tags for existing articles ----
+
+async function backfillTagsMode(apiKey: string, supabase: any) {
+  // Rows with empty or null tags — Postgres returns text[] as JS array,
+  // so we match on `cs.{}` (empty) and is.null. Two queries keep the
+  // PostgREST filter readable.
+  const { data: emptyRows, error: emptyErr } = await supabase
+    .from('articles')
+    .select('id, title, body, topic')
+    .eq('tags', '{}')
+  if (emptyErr) throw emptyErr
+
+  const { data: nullRows, error: nullErr } = await supabase
+    .from('articles')
+    .select('id, title, body, topic')
+    .is('tags', null)
+  if (nullErr) throw nullErr
+
+  const targets = [...(emptyRows || []), ...(nullRows || [])]
+  console.log(`Tags backfill: ${targets.length} articles missing tags`)
+
+  const results: { id: string; ok: boolean; error?: string; tags?: string[] }[] = []
+  for (const row of targets) {
+    try {
+      const parsed = await callClaude(
+        apiKey,
+        buildTagsBackfillPrompt(row.title, row.body, row.topic || ''),
+        300
+      )
+      const tags = normalizeTags(parsed?.tags, row.topic || '')
+      if (tags.length === 0) throw new Error('No valid tags produced')
+      const { error: upErr } = await supabase
+        .from('articles')
+        .update({ tags })
+        .eq('id', row.id)
+      if (upErr) throw upErr
+      results.push({ id: row.id, ok: true, tags })
+      console.log(`✓ tags ${row.id} ("${row.title}"): ${tags.join(', ')}`)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      results.push({ id: row.id, ok: false, error: msg })
+      console.error(`✗ tags failed ${row.id}: ${msg}`)
+    }
+  }
+
+  return {
+    ok: true,
+    mode: 'backfill_tags',
+    updated: results.filter((r) => r.ok).length,
+    failed: results.filter((r) => !r.ok).length,
+    totalCandidates: targets.length,
+    results
+  }
+}
+
 Deno.serve(async (req) => {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -256,11 +364,17 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey)
   const url = new URL(req.url)
   const isBackfill = url.searchParams.get('backfill') === 'true'
+  const isBackfillTags = url.searchParams.get('backfill_tags') === 'true'
 
   try {
-    const result = isBackfill
-      ? await backfillMode(apiKey, supabase)
-      : await generateMode(apiKey, supabase)
+    let result
+    if (isBackfillTags) {
+      result = await backfillTagsMode(apiKey, supabase)
+    } else if (isBackfill) {
+      result = await backfillMode(apiKey, supabase)
+    } else {
+      result = await generateMode(apiKey, supabase)
+    }
     return new Response(JSON.stringify(result), {
       headers: { 'content-type': 'application/json' }
     })
