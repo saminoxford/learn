@@ -12,7 +12,7 @@ const SUBJECTS = [
 ]
 
 export default function Home() {
-  const { activeProfile, setRoute, switchProfile, logout, preview, testMode, localOnly, isKidAccount } = useAppCtx()
+  const { activeProfile, setRoute, switchProfile, logout, preview, testMode, localOnly, isKidAccount, canWrite } = useAppCtx()
   const [counts, setCounts] = useState({})
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
@@ -55,15 +55,22 @@ export default function Home() {
         <div className="row">
           {preview && <span className="preview-badge">Preview</span>}
           {testMode && <span className="test-badge">Test</span>}
-          <button
-            className="profile-chip profile-chip-button"
-            onClick={() => setEditOpen(true)}
-            title="Edit name and avatar"
-          >
-            <span style={{ fontSize: '1.3rem' }}>{activeProfile.avatar}</span>
-            <span>{activeProfile.name}</span>
-            <span className="muted" style={{ fontSize: '0.8rem' }}>✏️</span>
-          </button>
+          {canWrite ? (
+            <button
+              className="profile-chip profile-chip-button"
+              onClick={() => setEditOpen(true)}
+              title="Edit name and avatar"
+            >
+              <span style={{ fontSize: '1.3rem' }}>{activeProfile.avatar}</span>
+              <span>{activeProfile.name}</span>
+              <span className="muted" style={{ fontSize: '0.8rem' }}>✏️</span>
+            </button>
+          ) : (
+            <div className="profile-chip">
+              <span style={{ fontSize: '1.3rem' }}>{activeProfile.avatar}</span>
+              <span>{activeProfile.name}</span>
+            </div>
+          )}
           {!isKidAccount && (
             <button className="btn-ghost" onClick={switchProfile}>Switch</button>
           )}
@@ -73,31 +80,48 @@ export default function Home() {
         </div>
       </div>
 
+      {!canWrite && (
+        <div className="card monitoring" style={{ marginBottom: 20 }}>
+          <h2 style={{ fontSize: '1.2rem' }}>👀 Monitoring {activeProfile.name}</h2>
+          <p className="muted" style={{ marginTop: 4 }}>
+            Read-only view. Use Dad mode to test the quizzes yourself.
+          </p>
+        </div>
+      )}
+
       <div className="card hero" style={{ marginBottom: 20 }}>
         <div className="spaced" style={{ flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <h2 style={{ fontSize: '1.8rem' }}>Hey {activeProfile.name}! 👋</h2>
-            <p className="muted">Pick a subject and let's go.</p>
+            <h2 style={{ fontSize: '1.8rem' }}>
+              {canWrite ? `Hey ${activeProfile.name}! 👋` : `${activeProfile.name}'s overview`}
+            </h2>
+            <p className="muted">
+              {canWrite
+                ? "Pick a subject and let's go."
+                : `${counts.Math || 0} Math · ${counts.Science || 0} Science · ${counts.Geography || 0} Geography sessions`}
+            </p>
           </div>
           <XPBar xp={activeProfile.xp ?? 0} />
         </div>
       </div>
 
-      <div className="grid subject-grid">
-        {SUBJECTS.map((s) => (
-          <button
-            key={s.key}
-            className={`tile ${s.tone}`}
-            onClick={() => setRoute({ name: 'grade', subject: s.key })}
-          >
-            <div className="emoji">{s.emoji}</div>
-            <h2>{s.key}</h2>
-            <div className="sub">
-              {loading ? '…' : `${counts[s.key] ?? 0} sessions`}
-            </div>
-          </button>
-        ))}
-      </div>
+      {canWrite && (
+        <div className="grid subject-grid">
+          {SUBJECTS.map((s) => (
+            <button
+              key={s.key}
+              className={`tile ${s.tone}`}
+              onClick={() => setRoute({ name: 'grade', subject: s.key })}
+            >
+              <div className="emoji">{s.emoji}</div>
+              <h2>{s.key}</h2>
+              <div className="sub">
+                {loading ? '…' : `${counts[s.key] ?? 0} sessions`}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 28 }}>
         <button onClick={() => setRoute({ name: 'progress' })}>

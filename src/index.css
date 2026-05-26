@@ -413,6 +413,16 @@ input:focus {
   color: #6ee7b7;
 }
 
+/* Monitoring banner (admin viewing a kid's read-only Home) */
+.monitoring {
+  background: linear-gradient(
+    135deg,
+    rgba(110, 231, 183, 0.15),
+    rgba(147, 197, 253, 0.15)
+  );
+  border-color: rgba(110, 231, 183, 0.4);
+}
+
 /* Hero card on Home */
 .hero {
   background: linear-gradient(

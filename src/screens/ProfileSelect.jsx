@@ -9,7 +9,7 @@ import { expectedProfilesForSession, visibleProfilesForSession } from '../profil
 const DAD_PASSWORD = 'iamdad'
 
 export default function ProfileSelect() {
-  const { session, setActiveProfile, logout, preview, enterTestMode, isKidAccount } = useAppCtx()
+  const { session, setActiveProfile, logout, preview, enterTestMode, isAdmin, isKidAccount } = useAppCtx()
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -37,11 +37,19 @@ export default function ProfileSelect() {
 
       const userId = session?.user?.id
       if (!userId) return
-      const { data: existing, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('owner_id', userId)
-        .order('created_at', { ascending: true })
+
+      // Admins fetch every profile in the system (RLS allows it). They
+      // don't own profile rows of their own and we never auto-create.
+      // Non-admins fetch only their own row, auto-creating it on first login.
+      const query = isAdmin
+        ? supabase.from('profiles').select('*').order('name')
+        : supabase
+            .from('profiles')
+            .select('*')
+            .eq('owner_id', userId)
+            .order('created_at', { ascending: true })
+
+      const { data: existing, error } = await query
 
       if (error) {
         if (!cancelled) {
@@ -52,26 +60,30 @@ export default function ProfileSelect() {
       }
 
       let rows = existing ?? []
-      if (rows.length === 0) {
+
+      if (!isAdmin && rows.length === 0) {
         const toInsert = expectedProfilesForSession(session).map((d) => ({
           owner_id: userId,
           name: d.name,
           avatar: d.avatar,
           xp: 0
         }))
-        const { data: inserted, error: insErr } = await supabase
-          .from('profiles')
-          .insert(toInsert)
-          .select()
-        if (insErr) {
-          if (!cancelled) {
-            setErr(insErr.message)
-            setLoading(false)
+        if (toInsert.length > 0) {
+          const { data: inserted, error: insErr } = await supabase
+            .from('profiles')
+            .insert(toInsert)
+            .select()
+          if (insErr) {
+            if (!cancelled) {
+              setErr(insErr.message)
+              setLoading(false)
+            }
+            return
           }
-          return
+          rows = inserted ?? []
         }
-        rows = inserted ?? []
       }
+
       if (!cancelled) {
         setProfiles(rows)
         setLoading(false)
@@ -81,7 +93,7 @@ export default function ProfileSelect() {
     return () => {
       cancelled = true
     }
-  }, [session, preview, email])
+  }, [session, preview, email, isAdmin])
 
   // Auto-select when only one visible profile (boys skip the picker entirely)
   const visible = preview ? profiles : visibleProfilesForSession(session, profiles)

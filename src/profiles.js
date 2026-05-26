@@ -31,11 +31,8 @@ export const AVATAR_OPTIONS = [
   '🚀', '🌟', '🎯', '⚽', '🎸', '👑'
 ]
 
-// Profiles auto-created for admin accounts on first login.
-const ADMIN_DEFAULT_PROFILES = [
-  { name: 'Marshall', avatar: '🦅' },
-  { name: 'Waylon', avatar: '🐊' }
-]
+// Admins don't own profile rows. They read every kid's real profile via
+// the admin RLS policies (see migration `admin_read_access`).
 
 function titleCase(s) {
   if (!s) return s
@@ -70,8 +67,9 @@ function applyAvatarOverride(row) {
 }
 
 // Profiles to insert when an account has no profile rows yet.
+// Admins don't auto-create anything — they read every kid's row directly.
 export function expectedProfilesForSession(session) {
-  if (isAdminSession(session)) return ADMIN_DEFAULT_PROFILES
+  if (isAdminSession(session)) return []
   const p = ownProfileFromSession(session)
   return p ? [p] : []
 }

@@ -88,6 +88,14 @@ export default function App() {
   // no Switch button, no Dad mode — just their own Home.
   const isKidAccount = !localOnly && !isAdmin
 
+  // Can the current session write to the active profile? True in preview/test
+  // (writes go to localStorage) and true when the active profile is owned by
+  // the logged-in user. False when an admin is monitoring someone else.
+  const canWrite =
+    localOnly ||
+    (!!activeProfile?.owner_id &&
+      activeProfile.owner_id === session?.user?.id)
+
   const ctxValue = {
     session,
     activeProfile,
@@ -103,7 +111,8 @@ export default function App() {
     testMode,
     localOnly,
     isAdmin,
-    isKidAccount
+    isKidAccount,
+    canWrite
   }
 
   if (envMissing && !preview) {
