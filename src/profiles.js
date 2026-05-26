@@ -2,18 +2,14 @@
 //
 // HOW TO ADD A NEW KID:
 //   1. Create the user in Supabase → Authentication → Users.
-//      Pick an email where the part before "@" is the kid's first name.
-//      Example: dawson@stubbs.app → profile named "Dawson"
-//   2. That's it. On first login a single profile is auto-created for
-//      them, and they go straight to Home. No code change required.
-//
-// HOW TO GIVE A KID A SPECIFIC AVATAR EMOJI:
-//   Add to AVATAR_OVERRIDES below. Otherwise they get the fallback 🙂.
-//   You can change this any time — the avatar is re-applied on every
-//   render so no DB update needed.
+//      Set a "Display name" (e.g. "Marshall") — that becomes the profile name.
+//      If you leave it blank, the app falls back to the email's local part.
+//   2. That's it. On first login a single profile is auto-created for them
+//      and they go straight to Home. They can rename themselves and pick
+//      a new avatar from inside the app at any time.
 //
 // HOW TO MAKE A USER AN ADMIN (full picker, Dad mode, sees all profiles):
-//   In Supabase SQL editor, run:
+//   In Supabase SQL editor:
 //     update auth.users
 //     set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb)
 //                           || '{"is_admin": true}'::jsonb
@@ -25,7 +21,15 @@ const AVATAR_OVERRIDES = {
   Waylon: '🐊'
 }
 
-const FALLBACK_AVATAR = '🙂'
+export const FALLBACK_AVATAR = '🙂'
+
+// Emoji choices shown in the in-app avatar picker.
+export const AVATAR_OPTIONS = [
+  '🦅', '🐊', '🐶', '🐱', '🦊', '🐼',
+  '🐯', '🦁', '🐸', '🐢', '🐝', '🦋',
+  '🐧', '🦉', '🐰', '🐨', '🦄', '🐲',
+  '🚀', '🌟', '🎯', '⚽', '🎸', '👑'
+]
 
 // Profiles auto-created for admin accounts on first login.
 const ADMIN_DEFAULT_PROFILES = [
@@ -43,36 +47,49 @@ function nameFromEmail(email) {
   return local ? titleCase(local) : null
 }
 
-function profileForEmail(email) {
-  const name = nameFromEmail(email)
+export function isAdminSession(session) {
+  return session?.user?.app_metadata?.is_admin === true
+}
+
+// The kid's own profile derived from their auth user, preferring fields the
+// user themselves can edit (display_name, avatar in user_metadata).
+function ownProfileFromSession(session) {
+  if (!session?.user) return null
+  const md = session.user.user_metadata || {}
+  const name = (md.display_name || nameFromEmail(session.user.email) || '').trim()
   if (!name) return null
-  return {
-    name,
-    avatar: AVATAR_OVERRIDES[name] ?? FALLBACK_AVATAR
-  }
+  const avatar = md.avatar || AVATAR_OVERRIDES[name] || FALLBACK_AVATAR
+  return { name, avatar }
 }
 
 function applyAvatarOverride(row) {
   return {
     ...row,
-    avatar: AVATAR_OVERRIDES[row.name] ?? row.avatar ?? FALLBACK_AVATAR
+    avatar: AVATAR_OVERRIDES[row.name] || row.avatar || FALLBACK_AVATAR
   }
 }
 
-// Profiles to insert on first login for an account that has none yet.
-export function expectedProfilesForEmail(email, isAdmin) {
-  if (isAdmin) return ADMIN_DEFAULT_PROFILES
-  const p = profileForEmail(email)
+// Profiles to insert when an account has no profile rows yet.
+export function expectedProfilesForSession(session) {
+  if (isAdminSession(session)) return ADMIN_DEFAULT_PROFILES
+  const p = ownProfileFromSession(session)
   return p ? [p] : []
 }
 
-// Profiles to show the logged-in user from the rows we fetched.
-// Admins see everything; kids only see the row matching their email.
-export function visibleProfilesForEmail(email, allProfiles, isAdmin) {
-  if (isAdmin) return allProfiles.map(applyAvatarOverride)
-  const p = profileForEmail(email)
-  if (!p) return []
-  return allProfiles
-    .filter((row) => row.name === p.name)
-    .map((row) => ({ ...row, avatar: p.avatar }))
+// Profiles to show the logged-in user. Admins see everything; non-admins
+// see exactly one row (their own), with name + avatar pulled live from
+// user_metadata so dashboard edits and in-app edits are reflected
+// immediately — even if the underlying DB row is briefly stale.
+export function visibleProfilesForSession(session, allProfiles) {
+  if (isAdminSession(session)) return allProfiles.map(applyAvatarOverride)
+  if (!allProfiles?.length) return []
+  const p = ownProfileFromSession(session)
+  const row = allProfiles[0]
+  return [
+    {
+      ...row,
+      name: p?.name ?? row.name,
+      avatar: p?.avatar ?? row.avatar ?? FALLBACK_AVATAR
+    }
+  ]
 }

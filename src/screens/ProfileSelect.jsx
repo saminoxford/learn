@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { useAppCtx } from '../AppContext.js'
 import { listProfiles as listPreviewProfiles } from '../previewStore.js'
-import { expectedProfilesForEmail, visibleProfilesForEmail } from '../profiles.js'
+import { expectedProfilesForSession, visibleProfilesForSession } from '../profiles.js'
 
 // Change this to whatever you want. The build inlines it into the bundle, so
 // it's obscure but not a real secret — fine for keeping kids out, not banks.
 const DAD_PASSWORD = 'iamdad'
 
 export default function ProfileSelect() {
-  const { session, setActiveProfile, logout, preview, enterTestMode, isAdmin, isKidAccount } = useAppCtx()
+  const { session, setActiveProfile, logout, preview, enterTestMode, isKidAccount } = useAppCtx()
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -53,7 +53,7 @@ export default function ProfileSelect() {
 
       let rows = existing ?? []
       if (rows.length === 0) {
-        const toInsert = expectedProfilesForEmail(email, isAdmin).map((d) => ({
+        const toInsert = expectedProfilesForSession(session).map((d) => ({
           owner_id: userId,
           name: d.name,
           avatar: d.avatar,
@@ -81,10 +81,10 @@ export default function ProfileSelect() {
     return () => {
       cancelled = true
     }
-  }, [session, preview, email, isAdmin])
+  }, [session, preview, email])
 
   // Auto-select when only one visible profile (boys skip the picker entirely)
-  const visible = preview ? profiles : visibleProfilesForEmail(email, profiles, isAdmin)
+  const visible = preview ? profiles : visibleProfilesForSession(session, profiles)
   useEffect(() => {
     if (loading) return
     if (visible.length === 1) {

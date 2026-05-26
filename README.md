@@ -1,6 +1,6 @@
-# Learn — Marshall & Waylon
+# Stubbs — Learn
 
-A learning quiz app for two kids. Math (1st–5th grade), Science (3rd grade), and Geography (3rd grade) with XP, streaks, and progress tracking.
+A learning quiz app for the Stubbs kids. Math (1st–5th grade), Science (3rd grade), and Geography (3rd grade) with XP, streaks, and progress tracking.
 
 Built with Vite + React + Supabase. Hosted on Vercel.
 

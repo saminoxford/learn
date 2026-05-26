@@ -1,7 +1,7 @@
 {
-  "name": "Marshall & Waylon — Learn",
+  "name": "Stubbs — Learn",
   "short_name": "Learn",
-  "description": "Math, science, and geography quizzes for Marshall and Waylon.",
+  "description": "Math, science, and geography quizzes for the Stubbs kids.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

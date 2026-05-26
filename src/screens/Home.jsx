@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { useAppCtx } from '../AppContext.js'
 import XPBar from '../components/XPBar.jsx'
+import EditProfile from '../components/EditProfile.jsx'
 import { listSessions as listPreviewSessions } from '../previewStore.js'
 
 const SUBJECTS = [
@@ -14,6 +15,7 @@ export default function Home() {
   const { activeProfile, setRoute, switchProfile, logout, preview, testMode, localOnly, isKidAccount } = useAppCtx()
   const [counts, setCounts] = useState({})
   const [loading, setLoading] = useState(true)
+  const [editOpen, setEditOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -53,10 +55,15 @@ export default function Home() {
         <div className="row">
           {preview && <span className="preview-badge">Preview</span>}
           {testMode && <span className="test-badge">Test</span>}
-          <div className="profile-chip">
+          <button
+            className="profile-chip profile-chip-button"
+            onClick={() => setEditOpen(true)}
+            title="Edit name and avatar"
+          >
             <span style={{ fontSize: '1.3rem' }}>{activeProfile.avatar}</span>
             <span>{activeProfile.name}</span>
-          </div>
+            <span className="muted" style={{ fontSize: '0.8rem' }}>✏️</span>
+          </button>
           {!isKidAccount && (
             <button className="btn-ghost" onClick={switchProfile}>Switch</button>
           )}
@@ -97,6 +104,8 @@ export default function Home() {
           📊 My Progress
         </button>
       </div>
+
+      {editOpen && <EditProfile onClose={() => setEditOpen(false)} />}
     </div>
   )
 }
