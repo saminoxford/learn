@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase, envMissing } from './supabase.js'
-import { isPreviewMode, disablePreviewMode } from './previewStore.js'
+import { isPreviewMode, disablePreviewMode, getDadProfile } from './previewStore.js'
 import { AppContext } from './AppContext.js'
 import Login from './screens/Login.jsx'
 import ProfileSelect from './screens/ProfileSelect.jsx'
@@ -11,7 +11,6 @@ import Results from './screens/Results.jsx'
 import Progress from './screens/Progress.jsx'
 
 const PREVIEW_SESSION = { user: { id: 'preview-user', email: 'preview@local' } }
-const DAD_PROFILE = { id: 'dad', name: 'Dad', avatar: '👨', xp: 0 }
 
 export default function App() {
   const [preview, setPreview] = useState(() => isPreviewMode())
@@ -72,7 +71,7 @@ export default function App() {
 
   const enterTestMode = () => {
     setTestMode(true)
-    setActiveProfile({ ...DAD_PROFILE })
+    setActiveProfile(getDadProfile())
     setRoute({ name: 'home' })
   }
 

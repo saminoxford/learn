@@ -6,6 +6,11 @@ const FLAG_KEY = 'learn:preview'
 const PROFILES_KEY = 'learn:preview:profiles'
 const SESSIONS_KEY = 'learn:preview:sessions'
 
+// Dad mode uses a separate key — Dad's identity (name/avatar) and accumulated
+// XP persist across exit + re-enter, but stay isolated from preview profiles.
+const DAD_KEY = 'learn:test:dad'
+export const DAD_DEFAULTS = { id: 'dad', name: 'Dad', avatar: '👨', xp: 0 }
+
 const DEFAULTS = [
   { name: 'Marshall', avatar: '🦅' },
   { name: 'Waylon', avatar: '🐊' }
@@ -56,7 +61,22 @@ export function listProfiles() {
   return rows
 }
 
+export function getDadProfile() {
+  const saved = read(DAD_KEY, null)
+  return { ...DAD_DEFAULTS, ...(saved || {}) }
+}
+
+function saveDadProfile(patch) {
+  const current = read(DAD_KEY, {})
+  const next = { ...current, ...patch }
+  write(DAD_KEY, next)
+  return { ...DAD_DEFAULTS, ...next }
+}
+
 export function updateProfile(id, patch) {
+  if (id === DAD_DEFAULTS.id) {
+    return saveDadProfile(patch)
+  }
   const rows = read(PROFILES_KEY, []).map((p) =>
     p.id === id ? { ...p, ...patch } : p
   )
