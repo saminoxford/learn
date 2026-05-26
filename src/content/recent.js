@@ -1,6 +1,13 @@
 // Sliding-window anti-repeat tracker. Per (profile × subject × grade), keep
 // a list of recently-shown question identifiers in localStorage so the
 // picker can prefer fresh questions over recently-seen ones.
+//
+// Lifetime ask-counts live in Supabase (question_attempts) — see
+// pickWithFrequencyBias below. localStorage is just the "don't show twice
+// in the next few quizzes" guard; Supabase is "over a kid's whole history,
+// nudge them toward questions they've seen less."
+
+import { getCachedAttempts } from './questionHistory.js'
 
 const WINDOW = 30 // remember the last 30 questions per slot
 
@@ -90,4 +97,36 @@ function shuffle(arr) {
     const j = Math.floor(Math.random() * (i + 1))
     ;[arr[i], arr[j]] = [arr[j], arr[i]]
   }
+}
+
+// Lifetime frequency bias: bucket candidates by how many times the kid
+// has been asked them across all sessions, prefer least-seen buckets, then
+// hand off to pickWithRecentMemory so the in-session sliding window still
+// guards against same-quiz dupes.
+//
+// Buckets: fresh (0 asks) → light (1-2) → heavy (3+). The cache reads
+// synchronously off whatever fetchAttemptsForSlot pre-warmed — if nothing's
+// warmed (preview mode, fetch failed) every candidate falls into "fresh".
+export function pickWithFrequencyBias(profileId, subject, grade, candidates, n) {
+  if (!candidates?.length) return []
+  const attempts = getCachedAttempts(profileId, subject, grade)
+  if (attempts.size === 0) {
+    return pickWithRecentMemory(profileId, subject, grade, candidates, n)
+  }
+
+  const fresh = []
+  const light = []
+  const heavy = []
+  for (const q of candidates) {
+    const id = questionId(q)
+    const c = attempts.get(id)?.ask_count ?? 0
+    if (c === 0) fresh.push(q)
+    else if (c <= 2) light.push(q)
+    else heavy.push(q)
+  }
+
+  // Concatenate in bias order, then run through the recent-window picker
+  // which keeps the in-session dedupe and updates localStorage.
+  const ordered = [...fresh, ...light, ...heavy]
+  return pickWithRecentMemory(profileId, subject, grade, ordered, n)
 }

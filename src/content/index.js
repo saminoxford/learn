@@ -9,7 +9,7 @@ import { generateSpellingQuestions, hasSpelling } from './spellingGenerators.js'
 import { generateReadingQuestions, hasReading } from './readingGenerators.js'
 import { generateLifeSkillsQuestions, hasLifeSkills } from './lifeSkills.js'
 import { generateRandomQuestions, hasRandom } from './randomMixed.js'
-import { pickWithRecentMemory } from './recent.js'
+import { pickWithFrequencyBias } from './recent.js'
 
 // Each generator returns an array of question objects shaped like
 //   { type: 'choice' | 'fill' | 'order', question, ... }
@@ -41,7 +41,7 @@ export function getQuestions(profileId, subject, grade, n = 10) {
   if (!gen) return []
   const oversample = gen(grade, n * 3)
   if (!oversample.length) return []
-  return pickWithRecentMemory(profileId, subject, grade, oversample, n)
+  return pickWithFrequencyBias(profileId, subject, grade, oversample, n)
 }
 
 export function hasContent(subject, grade) {

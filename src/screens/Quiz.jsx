@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { useAppCtx } from '../AppContext.js'
 import { getQuestions } from '../content/index.js'
 import { fetchMinedVocab, gradeToNum, setActiveTopic, getCachedMinedVocab } from '../content/minedVocab.js'
+import { fetchAttemptsForSlot, recordAttempts, buildAttempt } from '../content/questionHistory.js'
+import { questionId } from '../content/recent.js'
 import { recordSession, updateProfile } from '../previewStore.js'
 import FillAnswer from '../components/FillAnswer.jsx'
 import OrderAnswer from '../components/OrderAnswer.jsx'
@@ -54,10 +56,11 @@ export default function Quiz({ subject, grade }) {
     TOPIC_FILTERED_SUBJECTS.has(subject) ? profileTopic : null
   )
 
-  // Pre-warm the mined-vocab cache before generating questions so the
-  // Spelling/Reading generators see the merged pool. Other subjects pay
-  // the same ~50ms one-time fetch but ignore the cache. Skipped in
-  // preview/test mode where Supabase isn't hit.
+  // Pre-warm two Supabase reads before generating questions:
+  //   - mined vocab (Spelling/Reading word pool, optionally topic-filtered)
+  //   - question-attempts history (lifetime ask_count for frequency bias)
+  // Both populate caches the synchronous picker reads from. Skipped in
+  // preview/test mode.
   const [vocabReady, setVocabReady] = useState(localOnly)
   useEffect(() => {
     if (localOnly) {
@@ -67,15 +70,16 @@ export default function Quiz({ subject, grade }) {
     let cancelled = false
     setVocabReady(false)
     setActiveTopic(topic)
-    fetchMinedVocab(gradeToNum(grade), topic)
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setVocabReady(true)
-      })
+    Promise.all([
+      fetchMinedVocab(gradeToNum(grade), topic).catch(() => {}),
+      fetchAttemptsForSlot(activeProfile.id, subject, grade).catch(() => {})
+    ]).finally(() => {
+      if (!cancelled) setVocabReady(true)
+    })
     return () => {
       cancelled = true
     }
-  }, [grade, localOnly, topic])
+  }, [grade, subject, localOnly, topic, activeProfile.id])
 
   // Clear the module-level active topic on unmount so other parts of the
   // app aren't accidentally filtered.
@@ -105,6 +109,11 @@ export default function Quiz({ subject, grade }) {
   const [score, setScore] = useState(0)
   const [saving, setSaving] = useState(false)
   const [quitConfirm, setQuitConfirm] = useState(false)
+
+  // Per-quiz running log of {question_id, correct, snapshot} — flushed to
+  // question_attempts via RPC on finish. Ref (not state) so checkAnswer can
+  // push without triggering re-renders.
+  const attemptsRef = useRef([])
 
   const q = questions[idx]
   const isLast = idx === questions.length - 1
@@ -194,6 +203,26 @@ export default function Quiz({ subject, grade }) {
         : selected === q.answer
     if (right) setScore((s) => s + 1)
     chime(right)
+
+    // Log the attempt so we can batch-write all 10 at finish. Snapshot is
+    // only retained for wrong answers (the RPC drops it on correct), but
+    // we build it eagerly because `q` is in scope here.
+    attemptsRef.current.push(
+      buildAttempt({
+        question_id: questionId(q),
+        subject,
+        grade,
+        correct: right,
+        snapshot: {
+          type: q.type,
+          question: q.question,
+          options: q.options,
+          answer: q.answer,
+          steps: q.steps,
+          emoji: q.emoji
+        }
+      })
+    )
   }
 
   const next = async () => {
@@ -233,6 +262,11 @@ export default function Quiz({ subject, grade }) {
           .update({ xp: newXp })
           .eq('id', activeProfile.id)
         updateActiveProfile({ xp: newXp })
+
+        // Batch-record per-question stats. Best-effort: if this fails the
+        // quiz still saved, the kid still got XP — they just lose one
+        // round of history nudge data.
+        await recordAttempts(activeProfile.id, attemptsRef.current)
       }
     } catch (e) {
       console.error('Failed saving session', e)
@@ -257,6 +291,15 @@ export default function Quiz({ subject, grade }) {
       return
     }
     setQuitConfirm(true)
+  }
+
+  // Best-effort flush of any answered-but-unsubmitted attempts when the
+  // kid bails mid-quiz. Doesn't block the route change.
+  const confirmQuit = () => {
+    if (!localOnly && attemptsRef.current.length > 0) {
+      recordAttempts(activeProfile.id, attemptsRef.current).catch(() => {})
+    }
+    setRoute({ name: 'home' })
   }
 
   return (
@@ -368,7 +411,7 @@ export default function Quiz({ subject, grade }) {
               <button className="btn-ghost" onClick={() => setQuitConfirm(false)}>
                 Keep playing
               </button>
-              <button className="btn-primary" onClick={() => setRoute({ name: 'home' })}>
+              <button className="btn-primary" onClick={confirmQuit}>
                 Quit
               </button>
             </div>
