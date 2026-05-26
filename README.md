@@ -1,16 +1,72 @@
-# React + Vite
+# Learn — Marshall & Waylon
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A learning quiz app for two kids. Math (1st–5th grade), Science (3rd grade), and Geography (3rd grade) with XP, streaks, and progress tracking.
 
-Currently, two official plugins are available:
+Built with Vite + React + Supabase. Hosted on Vercel.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+- **Frontend:** Vite + React 19, vanilla CSS, ~120 KB gzipped
+- **Backend:** Supabase (Postgres + Auth, RLS-locked per user)
+- **Hosting:** Vercel (auto-deploys from `main`)
+- **No runtime dependencies** beyond `@supabase/supabase-js`
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Local development
 
-## Expanding the ESLint configuration
+```bash
+npm install
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Open http://localhost:5173. In dev mode, click **"Preview without account"** on the login screen to skip auth and play with localStorage-backed data.
+
+## Environment
+
+Create `.env` at the repo root (or add via `vercel env add`):
+
+```
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
+```
+
+## Project layout
+
+```
+src/
+  App.jsx                 root + routing
+  AppContext.js           shared profile/session context
+  supabase.js             client init
+  previewStore.js         localStorage-backed store for dev-only preview mode
+  components/
+    XPBar.jsx
+    Confetti.jsx
+  content/
+    math.js               15 questions × grades 1–5
+    science.js            3rd-grade starter set
+    geography.js          3rd-grade starter set
+  screens/
+    Login.jsx
+    ProfileSelect.jsx     Marshall & Waylon profile picker
+    Home.jsx              subject grid
+    GradeSelect.jsx       grade 1–5 picker
+    Quiz.jsx              10-question quiz with audio feedback
+    Results.jsx           score + confetti on perfect
+    Progress.jsx          history + per-subject stats
+```
+
+## Database
+
+Two tables, both with RLS scoped per auth user:
+
+- `profiles(id, owner_id → auth.users, name, avatar, xp, created_at)` — each auth user owns one or more profiles (Marshall + Waylon auto-created on first login).
+- `sessions(id, user_id → profiles, subject, grade, score, total, created_at)` — one row per finished quiz.
+
+Schema lives on Supabase; changes are applied via the Supabase MCP tools and reflected in the dashboard.
+
+## Adding content
+
+Edit `src/content/<subject>.js`. Each question is `{ question, options, answer, emoji }`. `answer` must exactly match one entry in `options`. Quizzes pick 10 questions at random from the pool for that grade.
+
+## Deploying
+
+`git push origin main` — Vercel auto-builds and deploys.
