@@ -21,7 +21,8 @@ const SUBJECTS = [
 ]
 
 export default function Home() {
-  const { activeProfile, setRoute, switchProfile, logout, preview, localOnly, isKidAccount, canWrite } = useAppCtx()
+  const { activeProfile, setRoute, switchProfile, logout, preview, localOnly, isKidAccount, isAdmin, canWrite } = useAppCtx()
+  const canEdit = canWrite || isAdmin
   const [counts, setCounts] = useState({})
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
@@ -81,11 +82,11 @@ export default function Home() {
         <div className="brand">🎓 Learn</div>
         <div className="row">
           {preview && <span className="preview-badge">Preview</span>}
-          {canWrite ? (
+          {canEdit ? (
             <button
               className="profile-chip profile-chip-button"
               onClick={() => setEditOpen(true)}
-              title="Edit name and avatar"
+              title={canWrite ? 'Edit name and avatar' : `Edit ${activeProfile.name}'s settings`}
             >
               <span style={{ fontSize: '1.3rem' }}>{activeProfile.avatar}</span>
               <span>{activeProfile.name}</span>
