@@ -19,6 +19,9 @@ export default function EditProfile({ onClose }) {
   const [readingLevel, setReadingLevel] = useState(
     Number(activeProfile.reading_level) || 3
   )
+  const [gradeLevel, setGradeLevel] = useState(
+    Number(activeProfile.grade_level) || 3
+  )
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -36,7 +39,8 @@ export default function EditProfile({ onClose }) {
         updatePreviewProfile(activeProfile.id, {
           name: cleaned,
           avatar,
-          reading_level: readingLevel
+          reading_level: readingLevel,
+          grade_level: gradeLevel
         })
       } else {
         const { error } = await supabase
@@ -44,7 +48,8 @@ export default function EditProfile({ onClose }) {
           .update({
             name: cleaned,
             avatar,
-            reading_level: readingLevel
+            reading_level: readingLevel,
+            grade_level: gradeLevel
           })
           .eq('id', activeProfile.id)
         if (error) throw error
@@ -54,7 +59,8 @@ export default function EditProfile({ onClose }) {
             data: {
               display_name: cleaned,
               avatar,
-              reading_level: readingLevel
+              reading_level: readingLevel,
+              grade_level: gradeLevel
             }
           })
         }
@@ -62,7 +68,8 @@ export default function EditProfile({ onClose }) {
       updateActiveProfile({
         name: cleaned,
         avatar,
-        reading_level: readingLevel
+        reading_level: readingLevel,
+        grade_level: gradeLevel
       })
       onClose()
     } catch (e) {
@@ -97,6 +104,23 @@ export default function EditProfile({ onClose }) {
               aria-label={`Choose ${opt}`}
             >
               {opt}
+            </button>
+          ))}
+        </div>
+
+        <label className="muted" style={{ fontSize: '0.85rem' }}>
+          Grade (default for quizzes)
+        </label>
+        <div className="reading-level-row" style={{ marginTop: 8, marginBottom: 18 }}>
+          {READING_LEVELS.map((rl) => (
+            <button
+              key={rl.value}
+              type="button"
+              className={`reading-pill ${rl.value === gradeLevel ? 'selected' : ''}`}
+              onClick={() => setGradeLevel(rl.value)}
+              aria-label={`Grade ${rl.label}`}
+            >
+              {rl.label}
             </button>
           ))}
         </div>

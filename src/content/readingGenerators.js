@@ -4,6 +4,13 @@
 // synonym/antonym, and cloze (fill the blank with multiple choice).
 
 import { WORDS, SYNONYMS, ANTONYMS } from './wordlists.js'
+import { getMinedForGrade, mergeWordlists } from './minedVocab.js'
+
+function poolForGrade(grade) {
+  const staticEntries = WORDS[grade] || []
+  const mined = getMinedForGrade(grade)
+  return mergeWordlists(staticEntries, mined)
+}
 
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
 
@@ -42,29 +49,31 @@ function choice(question, answer, distractors, emoji) {
 }
 
 function definitionMeaningQ(grade) {
-  const candidates = WORDS[grade].filter((e) => e.def)
+  const candidates = poolForGrade(grade).filter((e) => e.def)
   if (!candidates.length) return null
   const entry = pick(candidates)
   const distractors = distinctSample(
     candidates.map((e) => e.def).filter((d) => d !== entry.def),
     3
   )
-  return choice(`What does "${entry.word}" mean?`, entry.def, distractors, '📖')
+  return choice(`What does "${entry.word}" mean?`, entry.def, distractors, entry.emoji || '📖')
 }
 
 function reverseDefinitionQ(grade) {
-  const candidates = WORDS[grade].filter((e) => e.def)
+  const candidates = poolForGrade(grade).filter((e) => e.def)
   if (!candidates.length) return null
   const entry = pick(candidates)
   const distractors = distinctSample(
     candidates.map((e) => e.word).filter((w) => w !== entry.word),
     3
   )
-  return choice(`Which word means "${entry.def}"?`, entry.word, distractors, '🔍')
+  return choice(`Which word means "${entry.def}"?`, entry.word, distractors, entry.emoji || '🔍')
 }
 
 function clozeQ(grade) {
-  const candidates = WORDS[grade].filter((e) => e.sentence)
+  // Cloze only works for entries with a sentence — currently only the static
+  // wordlists provide one. Mined vocab can extend later.
+  const candidates = poolForGrade(grade).filter((e) => e.sentence)
   if (!candidates.length) return null
   const entry = pick(candidates)
   const distractors = distinctSample(
@@ -75,7 +84,7 @@ function clozeQ(grade) {
     `Fill the blank: "${entry.sentence}"`,
     entry.word,
     distractors,
-    '✏️'
+    entry.emoji || '✏️'
   )
 }
 
@@ -136,5 +145,5 @@ export function generateReadingQuestions(grade, n = 10) {
 }
 
 export function hasReading(grade) {
-  return !!BUILDERS[grade]?.length && !!WORDS[grade]?.length
+  return !!BUILDERS[grade]?.length && poolForGrade(grade).length > 0
 }

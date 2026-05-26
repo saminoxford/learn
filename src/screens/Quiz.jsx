@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { useAppCtx } from '../AppContext.js'
 import { getQuestions } from '../content/index.js'
+import { fetchMinedVocab, gradeToNum } from '../content/minedVocab.js'
 import { recordSession, updateProfile } from '../previewStore.js'
 import FillAnswer from '../components/FillAnswer.jsx'
 import OrderAnswer from '../components/OrderAnswer.jsx'
@@ -41,9 +42,28 @@ function chime(correct) {
 
 export default function Quiz({ subject, grade }) {
   const { activeProfile, setRoute, updateActiveProfile, localOnly } = useAppCtx()
+
+  // Pre-warm the mined-vocab cache before generating questions so the
+  // Spelling/Reading generators see the merged pool. Other subjects pay
+  // the same ~50ms one-time fetch but ignore the cache. Skipped in
+  // preview/test mode where Supabase isn't hit.
+  const [vocabReady, setVocabReady] = useState(localOnly)
+  useEffect(() => {
+    if (localOnly) return
+    let cancelled = false
+    fetchMinedVocab(gradeToNum(grade))
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setVocabReady(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [grade, localOnly])
+
   const questions = useMemo(
-    () => getQuestions(activeProfile.id, subject, grade, TOTAL),
-    [activeProfile.id, subject, grade]
+    () => (vocabReady ? getQuestions(activeProfile.id, subject, grade, TOTAL) : []),
+    [activeProfile.id, subject, grade, vocabReady]
   )
 
   const [idx, setIdx] = useState(0)
@@ -108,6 +128,14 @@ export default function Quiz({ subject, grade }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [idx, checked, questions, isFill, hasAnswer])
+
+  if (!vocabReady) {
+    return (
+      <div className="app-shell center-col">
+        <p className="muted">Loading questions…</p>
+      </div>
+    )
+  }
 
   if (questions.length === 0) {
     return (

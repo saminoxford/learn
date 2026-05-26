@@ -62,7 +62,8 @@ export default function ProfileSelect() {
               name: expected.name,
               avatar: expected.avatar,
               xp: 0,
-              reading_level: expected.reading_level ?? 3
+              reading_level: expected.reading_level ?? 3,
+              grade_level: expected.grade_level ?? 3
             })
             .select()
             .single()

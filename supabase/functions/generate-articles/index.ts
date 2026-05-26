@@ -1,8 +1,11 @@
 // Supabase Edge Function: generate-articles
 //
-// Runs daily via pg_cron. For each reading level 1-5, generates 2 fresh
-// "Did You Know?" articles using the Anthropic API (Claude Haiku) and
-// inserts them into the `articles` table.
+// Two modes:
+//   Default (POST without args): generate ~10 fresh "Did You Know?"
+//     articles via Claude Haiku and insert into the `articles` table.
+//   Backfill (POST ?backfill=true): for each article whose `vocab`
+//     column is still empty, call Claude with the existing body to
+//     extract 3-5 vocabulary words and update the row.
 //
 // Tolerates a missing ANTHROPIC_API_KEY — logs and no-ops so the app
 // keeps working off the seed content.
@@ -28,12 +31,18 @@ const READING_LEVEL_PROMPTS: Record<number, string> = {
   5: '5th-grade reading level. Longer sentences allowed. More complex concepts and vocabulary. ~400 words total. Tone: thoughtful and a little dramatic.'
 }
 
-function buildPrompt(readingLevel: number, topic: string) {
+function buildArticlePrompt(readingLevel: number, topic: string) {
   return `Write a short "Did You Know?" article for kids at a ${READING_LEVEL_PROMPTS[readingLevel]}
 
 Topic: ${topic}
 
-Pick ONE fascinating, surprising, age-appropriate fact about ${topic} that most kids would not know. Write 3-4 paragraphs separated by blank lines. Then write exactly 2 multiple-choice comprehension questions about the article. Each question must have exactly 4 options and one correct answer.
+Pick ONE fascinating, surprising, age-appropriate fact about ${topic} that most kids would not know. Write 3-4 paragraphs separated by blank lines. Then write exactly 2 multiple-choice comprehension questions about the article. Then extract 3-5 vocabulary words from the article body. Each must have exactly 4 options and one correct answer for questions.
+
+Vocabulary rules:
+- Choose MEANINGFUL nouns, verbs, or adjectives that appear in the article body.
+- Skip stopwords: the, a, an, is, are, was, were, be, of, to, in, and, or, but, with, on, for, at, by, from, as, that, this, it, he, she, they, we, you.
+- Prefer words that build the kid's vocabulary — interesting words tied to the topic, not common kid words.
+- For each word, give: lowercase form, kid-friendly definition, part of speech ("noun"|"verb"|"adjective"), a single best-fit emoji (use "📖" if nothing obvious), and an optional antonyms array (1-2 opposite words, or empty array).
 
 Output STRICT JSON with no preamble or markdown fences:
 {
@@ -43,6 +52,10 @@ Output STRICT JSON with no preamble or markdown fences:
   "questions": [
     { "question": "...?", "options": ["A", "B", "C", "D"], "answer": "B" },
     { "question": "...?", "options": ["A", "B", "C", "D"], "answer": "A" }
+  ],
+  "vocab": [
+    { "word": "fossil", "definition": "the preserved remains of something that lived long ago", "pos": "noun", "emoji": "🦴", "antonyms": [] },
+    { "word": "ancient", "definition": "very old", "pos": "adjective", "emoji": "🏛️", "antonyms": ["modern", "new"] }
   ]
 }
 
@@ -52,7 +65,27 @@ Rules:
 - Each "answer" string must appear EXACTLY in the matching "options" array.`
 }
 
-async function generateOneArticle(apiKey: string, readingLevel: number, topic: string) {
+function buildBackfillPrompt(body: string, readingLevel: number) {
+  return `Given this kids' "Did You Know?" article at a ${READING_LEVEL_PROMPTS[readingLevel]}, extract 3-5 vocabulary words that build a kid's vocabulary.
+
+ARTICLE:
+${body}
+
+Vocabulary rules:
+- Choose MEANINGFUL nouns, verbs, or adjectives that appear in the article body.
+- Skip stopwords: the, a, an, is, are, was, were, be, of, to, in, and, or, but, with, on, for, at, by, from, as, that, this, it, he, she, they, we, you.
+- Prefer words that build vocabulary — interesting words tied to the topic, not common kid words.
+- For each word: lowercase form, kid-friendly definition, part of speech ("noun"|"verb"|"adjective"), a single best-fit emoji (use "📖" if nothing obvious), optional antonyms array.
+
+Output STRICT JSON, nothing else:
+{
+  "vocab": [
+    { "word": "fossil", "definition": "the preserved remains of something that lived long ago", "pos": "noun", "emoji": "🦴", "antonyms": [] }
+  ]
+}`
+}
+
+async function callClaude(apiKey: string, prompt: string, maxTokens = 1500) {
   const res = await fetch(ANTHROPIC_API_URL, {
     method: 'POST',
     headers: {
@@ -62,8 +95,8 @@ async function generateOneArticle(apiKey: string, readingLevel: number, topic: s
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 1500,
-      messages: [{ role: 'user', content: buildPrompt(readingLevel, topic) }]
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }]
     })
   })
 
@@ -76,11 +109,25 @@ async function generateOneArticle(apiKey: string, readingLevel: number, topic: s
   const text = data?.content?.[0]?.text
   if (!text) throw new Error('No text in Anthropic response')
 
-  // Strip any accidental markdown fences
   const clean = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
-  const parsed = JSON.parse(clean)
+  return JSON.parse(clean)
+}
 
-  // Sanity check
+function isValidVocab(vocab: unknown): vocab is any[] {
+  if (!Array.isArray(vocab)) return false
+  return vocab.every(
+    (v) =>
+      v &&
+      typeof v === 'object' &&
+      typeof v.word === 'string' &&
+      typeof v.definition === 'string' &&
+      typeof v.pos === 'string' &&
+      ['noun', 'verb', 'adjective'].includes(v.pos) &&
+      typeof v.emoji === 'string'
+  )
+}
+
+function validateArticle(parsed: any) {
   if (!parsed.title || !parsed.body || !Array.isArray(parsed.questions)) {
     throw new Error('Generated article missing required fields')
   }
@@ -92,15 +139,103 @@ async function generateOneArticle(apiKey: string, readingLevel: number, topic: s
       throw new Error(`Answer "${q.answer}" not in options ${JSON.stringify(q.options)}`)
     }
   }
-
-  return parsed
+  // Vocab is best-effort — if invalid, drop it and continue
+  if (!isValidVocab(parsed.vocab)) {
+    parsed.vocab = []
+  }
 }
 
 function pickTopic(): string {
   return TOPICS[Math.floor(Math.random() * TOPICS.length)]
 }
 
-Deno.serve(async (_req) => {
+// ---- Mode: generate new articles ----
+
+async function generateMode(apiKey: string, supabase: any) {
+  const results: { level: number; ok: boolean; error?: string; title?: string }[] = []
+
+  for (let level = 1; level <= 5; level++) {
+    for (let i = 0; i < ARTICLES_PER_LEVEL; i++) {
+      const topic = pickTopic()
+      try {
+        const article = await callClaude(apiKey, buildArticlePrompt(level, topic))
+        validateArticle(article)
+        const { error } = await supabase.from('articles').insert({
+          reading_level: level,
+          title: article.title,
+          body: article.body,
+          questions: article.questions,
+          vocab: article.vocab || [],
+          topic: article.topic || topic,
+          source: 'claude-api',
+          tags: []
+        })
+        if (error) throw error
+        results.push({ level, ok: true, title: article.title })
+        console.log(`✓ level ${level} topic ${topic}: "${article.title}" (${article.vocab?.length || 0} vocab)`)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        results.push({ level, ok: false, error: msg })
+        console.error(`✗ level ${level} topic ${topic}: ${msg}`)
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    mode: 'generate',
+    generated: results.filter((r) => r.ok).length,
+    failed: results.filter((r) => !r.ok).length,
+    results
+  }
+}
+
+// ---- Mode: backfill vocab for existing articles ----
+
+async function backfillMode(apiKey: string, supabase: any) {
+  const { data: rows, error } = await supabase
+    .from('articles')
+    .select('id, body, reading_level, title')
+    .eq('vocab', '[]')
+    .order('created_at', { ascending: true })
+  if (error) throw error
+
+  const targets = rows || []
+  console.log(`Backfill: ${targets.length} articles missing vocab`)
+
+  const results: { id: string; ok: boolean; error?: string; words?: number }[] = []
+  for (const row of targets) {
+    try {
+      const parsed = await callClaude(apiKey, buildBackfillPrompt(row.body, row.reading_level), 800)
+      const vocab = parsed?.vocab
+      if (!isValidVocab(vocab) || vocab.length === 0) {
+        throw new Error('Invalid or empty vocab returned')
+      }
+      const { error: upErr } = await supabase
+        .from('articles')
+        .update({ vocab })
+        .eq('id', row.id)
+      if (upErr) throw upErr
+      results.push({ id: row.id, ok: true, words: vocab.length })
+      console.log(`✓ backfilled ${row.id} ("${row.title}"): ${vocab.length} words`)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      results.push({ id: row.id, ok: false, error: msg })
+      console.error(`✗ backfill failed ${row.id}: ${msg}`)
+    }
+  }
+
+  return {
+    ok: true,
+    mode: 'backfill',
+    updated: results.filter((r) => r.ok).length,
+    failed: results.filter((r) => !r.ok).length,
+    totalCandidates: targets.length,
+    results
+  }
+}
+
+Deno.serve(async (req) => {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -119,40 +254,21 @@ Deno.serve(async (_req) => {
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey)
-  const results: { level: number; ok: boolean; error?: string; title?: string }[] = []
+  const url = new URL(req.url)
+  const isBackfill = url.searchParams.get('backfill') === 'true'
 
-  for (let level = 1; level <= 5; level++) {
-    for (let i = 0; i < ARTICLES_PER_LEVEL; i++) {
-      const topic = pickTopic()
-      try {
-        const article = await generateOneArticle(apiKey, level, topic)
-        const { error } = await supabase.from('articles').insert({
-          reading_level: level,
-          title: article.title,
-          body: article.body,
-          questions: article.questions,
-          topic: article.topic || topic,
-          source: 'claude-api',
-          tags: []
-        })
-        if (error) throw error
-        results.push({ level, ok: true, title: article.title })
-        console.log(`✓ level ${level} topic ${topic}: "${article.title}"`)
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        results.push({ level, ok: false, error: msg })
-        console.error(`✗ level ${level} topic ${topic}: ${msg}`)
-      }
-    }
+  try {
+    const result = isBackfill
+      ? await backfillMode(apiKey, supabase)
+      : await generateMode(apiKey, supabase)
+    return new Response(JSON.stringify(result), {
+      headers: { 'content-type': 'application/json' }
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return new Response(JSON.stringify({ ok: false, error: msg }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' }
+    })
   }
-
-  return new Response(
-    JSON.stringify({
-      ok: true,
-      generated: results.filter((r) => r.ok).length,
-      failed: results.filter((r) => !r.ok).length,
-      results
-    }),
-    { headers: { 'content-type': 'application/json' } }
-  )
 })

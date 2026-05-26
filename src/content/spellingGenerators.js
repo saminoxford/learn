@@ -13,6 +13,14 @@
 // So the kid has to know BOTH the meaning AND the spelling.
 
 import { WORDS, ANTONYMS } from './wordlists.js'
+import { getMinedForGrade, mergeWordlists } from './minedVocab.js'
+
+// Returns the combined static + mined word pool for the given grade label.
+function poolForGrade(grade) {
+  const staticEntries = WORDS[grade] || []
+  const mined = getMinedForGrade(grade)
+  return mergeWordlists(staticEntries, mined)
+}
 
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
 const VOWELS = ['a', 'e', 'i', 'o', 'u']
@@ -102,7 +110,8 @@ function antonymOf(word) {
 // ---- 1st-2nd grade: which spelling is correct? ----
 
 function spellChoiceQ(grade) {
-  const entry = pick(WORDS[grade])
+  const pool = poolForGrade(grade)
+  const entry = pick(pool)
   const wrongs = plausibleMisspellings(entry.word, 3)
   return {
     type: 'choice',
@@ -116,7 +125,8 @@ function spellChoiceQ(grade) {
 // ---- 3rd-5th grade: meaning + spelling combined MC ----
 
 function spellMeaningQ(grade) {
-  const entry = pick(WORDS[grade])
+  const pool = poolForGrade(grade)
+  const entry = pick(pool)
   const def = entry.def || 'this word'
 
   // Build the 4 options:
@@ -126,13 +136,18 @@ function spellMeaningQ(grade) {
   const misspelled = plausibleMisspelling(entry.word)
 
   const others = []
-  const antonym = antonymOf(entry.word)
-  if (antonym && antonym !== entry.word) others.push(antonym)
+  // First try a mined antonym from the vocab entry itself, then the static table.
+  const minedAntonym = Array.isArray(entry.antonyms)
+    ? entry.antonyms.find((a) => a && a !== entry.word)
+    : null
+  if (minedAntonym) others.push(minedAntonym)
+  const tableAntonym = antonymOf(entry.word)
+  if (tableAntonym && tableAntonym !== entry.word && !others.includes(tableAntonym)) {
+    others.push(tableAntonym)
+  }
 
-  // Fill remaining "other word" slots from same-grade list, avoiding the
-  // target and any already-chosen others.
   const otherCandidates = shuffle(
-    WORDS[grade]
+    pool
       .map((e) => e.word)
       .filter((w) => w !== entry.word && !others.includes(w))
   )
@@ -177,5 +192,7 @@ export function generateSpellingQuestions(grade, n = 10) {
 }
 
 export function hasSpelling(grade) {
-  return !!BUILDERS[grade]?.length && !!WORDS[grade]?.length
+  // Available if either static OR mined pool has entries (mined only matters
+  // after vocab has been backfilled / generated; static is always present).
+  return !!BUILDERS[grade]?.length && poolForGrade(grade).length > 0
 }
