@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { supabase, envMissing } from './supabase.js'
 import { isPreviewMode, disablePreviewMode } from './previewStore.js'
 import { AppContext } from './AppContext.js'
-import { isKidEmail } from './profiles.js'
 import Login from './screens/Login.jsx'
 import ProfileSelect from './screens/ProfileSelect.jsx'
 import Home from './screens/Home.jsx'
@@ -80,10 +79,14 @@ export default function App() {
   // Bypass real Supabase writes when in either preview or test mode
   const localOnly = preview || testMode
 
-  // A "kid account" is one that's locked to a single profile and shouldn't
-  // see the picker, Switch button, or Dad mode. Preview and test sessions
-  // never count as kid accounts (they're for adults exploring the UI).
-  const isKidAccount = !localOnly && isKidEmail(session?.user?.email)
+  // Admin flag comes from auth.users.raw_app_meta_data.is_admin — set in
+  // Supabase via the admin API, so kids can't promote themselves. Preview
+  // and test modes count as admin so the full UI is exercisable.
+  const isAdmin = localOnly || session?.user?.app_metadata?.is_admin === true
+
+  // Kid account = a real, non-admin auth session. These see no picker,
+  // no Switch button, no Dad mode — just their own Home.
+  const isKidAccount = !localOnly && !isAdmin
 
   const ctxValue = {
     session,
@@ -99,6 +102,7 @@ export default function App() {
     preview,
     testMode,
     localOnly,
+    isAdmin,
     isKidAccount
   }
 

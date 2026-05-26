@@ -9,7 +9,7 @@ import { expectedProfilesForEmail, visibleProfilesForEmail } from '../profiles.j
 const DAD_PASSWORD = 'iamdad'
 
 export default function ProfileSelect() {
-  const { session, setActiveProfile, logout, preview, enterTestMode, isKidAccount } = useAppCtx()
+  const { session, setActiveProfile, logout, preview, enterTestMode, isAdmin, isKidAccount } = useAppCtx()
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -53,7 +53,7 @@ export default function ProfileSelect() {
 
       let rows = existing ?? []
       if (rows.length === 0) {
-        const toInsert = expectedProfilesForEmail(email).map((d) => ({
+        const toInsert = expectedProfilesForEmail(email, isAdmin).map((d) => ({
           owner_id: userId,
           name: d.name,
           avatar: d.avatar,
@@ -81,12 +81,13 @@ export default function ProfileSelect() {
     return () => {
       cancelled = true
     }
-  }, [session, preview, email])
+  }, [session, preview, email, isAdmin])
 
   // Auto-select when only one visible profile (boys skip the picker entirely)
-  const visible = preview ? profiles : visibleProfilesForEmail(email, profiles)
+  const visible = preview ? profiles : visibleProfilesForEmail(email, profiles, isAdmin)
   useEffect(() => {
-    if (!loading && visible.length === 1) {
+    if (loading) return
+    if (visible.length === 1) {
       setActiveProfile(visible[0])
     }
   }, [loading, visible, setActiveProfile])
