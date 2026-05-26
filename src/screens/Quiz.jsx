@@ -1,27 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { useAppCtx } from '../AppContext.js'
-import { mathQuestions } from '../content/math.js'
-import { scienceQuestions } from '../content/science.js'
-import { geographyQuestions } from '../content/geography.js'
+import { getQuestions } from '../content/index.js'
 import { recordSession, updateProfile } from '../previewStore.js'
-
-const BANKS = {
-  Math: mathQuestions,
-  Science: scienceQuestions,
-  Geography: geographyQuestions
-}
+import FillAnswer from '../components/FillAnswer.jsx'
+import { normalizeFill } from '../components/fillCompare.js'
 
 const TOTAL = 10
-
-function pickQuestions(pool) {
-  const copy = [...pool]
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[copy[i], copy[j]] = [copy[j], copy[i]]
-  }
-  return copy.slice(0, Math.min(TOTAL, copy.length))
-}
 
 // gentle Web Audio chimes — no external assets
 function chime(correct) {
@@ -53,35 +38,53 @@ function chime(correct) {
 
 export default function Quiz({ subject, grade }) {
   const { activeProfile, setRoute, updateActiveProfile, localOnly } = useAppCtx()
-  const questions = useMemo(() => {
-    const pool = BANKS[subject]?.[grade] ?? []
-    return pickQuestions(pool)
-  }, [subject, grade])
+  const questions = useMemo(
+    () => getQuestions(activeProfile.id, subject, grade, TOTAL),
+    [activeProfile.id, subject, grade]
+  )
 
   const [idx, setIdx] = useState(0)
-  const [selected, setSelected] = useState(null)
+  const [selected, setSelected] = useState(null) // for 'choice'
+  const [typed, setTyped] = useState('') // for 'fill'
   const [checked, setChecked] = useState(false)
   const [score, setScore] = useState(0)
   const [saving, setSaving] = useState(false)
   const [quitConfirm, setQuitConfirm] = useState(false)
 
-  // keyboard shortcuts: 1-4 to select, Enter to advance
+  const q = questions[idx]
+  const isLast = idx === questions.length - 1
+  const isFill = q?.type === 'fill'
+
+  // For fill, "selected" is the typed value. Match comparison is normalized.
+  const isCorrect = isFill
+    ? normalizeFill(typed) === normalizeFill(q?.answer)
+    : selected === q?.answer
+
+  const hasAnswer = isFill ? typed.trim().length > 0 : selected != null
+
+  // keyboard shortcuts: digits select choices, Enter advances
   useEffect(() => {
     const onKey = (e) => {
       if (questions.length === 0) return
+      const cur = questions[idx]
+      if (!cur) return
       if (e.key === 'Enter') {
+        // Don't let Enter inside the input bubble up before the user typed something
+        if (isFill && !hasAnswer && !checked) return
         const btn = document.getElementById('quiz-primary-btn')
         if (btn && !btn.disabled) btn.click()
         return
       }
-      const n = Number(e.key)
-      if (Number.isInteger(n) && n >= 1 && n <= questions[idx]?.options.length) {
-        if (!checked) setSelected(questions[idx].options[n - 1])
+      if (cur.type === 'choice') {
+        const n = Number(e.key)
+        if (Number.isInteger(n) && n >= 1 && n <= cur.options.length) {
+          if (!checked) setSelected(cur.options[n - 1])
+        }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [idx, checked, questions])
+  }, [idx, checked, questions, isFill, hasAnswer])
 
   if (questions.length === 0) {
     return (
@@ -99,14 +102,12 @@ export default function Quiz({ subject, grade }) {
     )
   }
 
-  const q = questions[idx]
-  const isLast = idx === questions.length - 1
-  const isCorrect = selected === q.answer
-
   const checkAnswer = () => {
-    if (selected == null) return
+    if (!hasAnswer) return
     setChecked(true)
-    const right = selected === q.answer
+    const right = isFill
+      ? normalizeFill(typed) === normalizeFill(q.answer)
+      : selected === q.answer
     if (right) setScore((s) => s + 1)
     chime(right)
   }
@@ -115,10 +116,10 @@ export default function Quiz({ subject, grade }) {
     if (!isLast) {
       setIdx((i) => i + 1)
       setSelected(null)
+      setTyped('')
       setChecked(false)
       return
     }
-    // Finished
     setSaving(true)
     const xpEarned = score * 10
     try {
@@ -175,13 +176,9 @@ export default function Quiz({ subject, grade }) {
   return (
     <div className="app-shell">
       <div className="top-bar">
-        <button className="btn-ghost" onClick={requestQuit}>
-          ← Quit
-        </button>
+        <button className="btn-ghost" onClick={requestQuit}>← Quit</button>
         <div className="brand">{subject} · {grade}</div>
-        <div className="muted">
-          {idx + 1} / {questions.length}
-        </div>
+        <div className="muted">{idx + 1} / {questions.length}</div>
       </div>
 
       <div className="progress-bar" style={{ marginBottom: 24 }}>
@@ -192,40 +189,50 @@ export default function Quiz({ subject, grade }) {
         <div style={{ fontSize: '3.4rem', textAlign: 'center', lineHeight: 1 }}>
           {q.emoji}
         </div>
-        <h2 style={{ textAlign: 'center', marginTop: 14, fontSize: '1.7rem' }}>
+        <h2 style={{ textAlign: 'center', marginTop: 14, fontSize: '1.5rem' }}>
           {q.question}
         </h2>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {q.options.map((opt, i) => {
-          let cls = 'option-btn'
-          if (checked) {
-            if (opt === q.answer) cls += ' correct'
-            else if (opt === selected) cls += ' wrong'
-          } else if (opt === selected) {
-            cls += ' selected'
-          }
-          return (
-            <button
-              key={opt}
-              className={cls}
-              disabled={checked}
-              onClick={() => setSelected(opt)}
-            >
-              <span className="option-num">{i + 1}</span>
-              <span className="option-text">{opt}</span>
-            </button>
-          )
-        })}
-      </div>
+      {isFill ? (
+        <FillAnswer
+          value={typed}
+          onChange={setTyped}
+          checked={checked}
+          correct={isCorrect}
+          hint={q.hint}
+        />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {q.options.map((opt, i) => {
+            let cls = 'option-btn'
+            if (checked) {
+              if (opt === q.answer) cls += ' correct'
+              else if (opt === selected) cls += ' wrong'
+            } else if (opt === selected) {
+              cls += ' selected'
+            }
+            return (
+              <button
+                key={opt}
+                className={cls}
+                disabled={checked}
+                onClick={() => setSelected(opt)}
+              >
+                <span className="option-num">{i + 1}</span>
+                <span className="option-text">{opt}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       <div style={{ marginTop: 24, display: 'flex', justifyContent: 'center' }}>
         {!checked ? (
           <button
             id="quiz-primary-btn"
             className="btn-primary"
-            disabled={selected == null}
+            disabled={!hasAnswer}
             onClick={checkAnswer}
           >
             Check answer

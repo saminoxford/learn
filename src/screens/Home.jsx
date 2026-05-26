@@ -8,7 +8,9 @@ import { listSessions as listPreviewSessions } from '../previewStore.js'
 const SUBJECTS = [
   { key: 'Math', emoji: '🔢', tone: 'math' },
   { key: 'Science', emoji: '🔬', tone: 'science' },
-  { key: 'Geography', emoji: '🌎', tone: 'geography' }
+  { key: 'Geography', emoji: '🌎', tone: 'geography' },
+  { key: 'Spelling', emoji: '🔤', tone: 'spelling' },
+  { key: 'Reading', emoji: '📚', tone: 'reading' }
 ]
 
 export default function Home() {
