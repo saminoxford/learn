@@ -186,6 +186,28 @@ input:focus {
   cursor: not-allowed;
 }
 
+.level-badge {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.level-badge--stretch {
+  background: rgba(251, 146, 60, 0.18); /* matches --accent-lifeskills tone */
+  color: #fb923c;
+  border: 1px solid rgba(251, 146, 60, 0.45);
+}
+
+.level-badge--review {
+  background: rgba(147, 197, 253, 0.18); /* matches --accent-geography */
+  color: #93c5fd;
+  border: 1px solid rgba(147, 197, 253, 0.45);
+}
+
 .row {
   display: flex;
   align-items: center;

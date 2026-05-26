@@ -3,6 +3,19 @@ import { supabase } from '../supabase.js'
 import { useAppCtx } from '../AppContext.js'
 import XPBar from '../components/XPBar.jsx'
 import { listSessions as listPreviewSessions } from '../previewStore.js'
+import { gradeToNum } from '../content/minedVocab.js'
+
+// Compare a quiz's grade label ("3rd Grade") against the kid's current
+// profile grade_level. Powers the Stretch/Review badge on recent rows.
+function levelBadge(sessionGrade, profileGradeLevel) {
+  if (!sessionGrade || !profileGradeLevel) return null
+  const sg = gradeToNum(sessionGrade)
+  const pg = Number(profileGradeLevel)
+  if (!sg || !pg) return null
+  if (sg > pg) return { label: 'Stretch ↑', cls: 'level-badge level-badge--stretch' }
+  if (sg < pg) return { label: 'Review ↓', cls: 'level-badge level-badge--review' }
+  return null // at-grade: no badge, reduces visual noise
+}
 
 export default function Progress() {
   const { activeProfile, setRoute, localOnly } = useAppCtx()
@@ -94,16 +107,22 @@ export default function Progress() {
         {!loading && recent.length === 0 && (
           <p className="muted">No recent activity yet.</p>
         )}
-        {recent.map((s) => (
-          <div key={s.id} className="session-row">
-            <strong>{s.subject}</strong>
-            <span className="muted">{s.grade}</span>
-            <span>{s.score}/{s.total}</span>
-            <span className="muted">
-              {s.created_at ? new Date(s.created_at).toLocaleDateString() : ''}
-            </span>
-          </div>
-        ))}
+        {recent.map((s) => {
+          const badge = levelBadge(s.grade, activeProfile.grade_level)
+          return (
+            <div key={s.id} className="session-row">
+              <strong>{s.subject}</strong>
+              <span className="muted">
+                {badge && <span className={badge.cls}>{badge.label}</span>}
+                {s.grade}
+              </span>
+              <span>{s.score}/{s.total}</span>
+              <span className="muted">
+                {s.created_at ? new Date(s.created_at).toLocaleDateString() : ''}
+              </span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
