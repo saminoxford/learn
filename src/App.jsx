@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase, envMissing } from './supabase.js'
-import { isPreviewMode, disablePreviewMode, getDadProfile } from './previewStore.js'
+import { isPreviewMode, disablePreviewMode } from './previewStore.js'
 import { AppContext } from './AppContext.js'
 import Login from './screens/Login.jsx'
 import ProfileSelect from './screens/ProfileSelect.jsx'
@@ -18,7 +18,6 @@ export default function App() {
   const [sessionLoaded, setSessionLoaded] = useState(() => preview)
   const [activeProfile, setActiveProfile] = useState(null)
   const [route, setRoute] = useState({ name: 'home' })
-  const [testMode, setTestMode] = useState(false)
 
   useEffect(() => {
     if (preview) return
@@ -31,19 +30,12 @@ export default function App() {
       if (!s) {
         setActiveProfile(null)
         setRoute({ name: 'home' })
-        setTestMode(false)
       }
     })
     return () => sub.subscription.unsubscribe()
   }, [preview])
 
   const logout = async () => {
-    if (testMode) {
-      setTestMode(false)
-      setActiveProfile(null)
-      setRoute({ name: 'home' })
-      return
-    }
     if (preview) {
       disablePreviewMode()
       setPreview(false)
@@ -56,9 +48,6 @@ export default function App() {
   }
 
   const switchProfile = () => {
-    if (testMode) {
-      setTestMode(false)
-    }
     setActiveProfile(null)
     setRoute({ name: 'home' })
   }
@@ -69,29 +58,21 @@ export default function App() {
     setSessionLoaded(true)
   }
 
-  const enterTestMode = () => {
-    setTestMode(true)
-    setActiveProfile(getDadProfile())
-    setRoute({ name: 'home' })
-  }
-
-  // Bypass real Supabase writes when in either preview or test mode
-  const localOnly = preview || testMode
-
   // Admin flag comes from auth.users.raw_app_meta_data.is_admin — set in
-  // Supabase via the admin API, so kids can't promote themselves. Preview
-  // and test modes count as admin so the full UI is exercisable.
-  const isAdmin = localOnly || session?.user?.app_metadata?.is_admin === true
+  // Supabase via the admin API, so kids can't promote themselves. Admins
+  // can read every profile and every session; they cannot write to others'
+  // rows (RLS enforces owner_id = auth.uid() on writes).
+  const isAdmin = preview || session?.user?.app_metadata?.is_admin === true
 
-  // Kid account = a real, non-admin auth session. These see no picker,
-  // no Switch button, no Dad mode — just their own Home.
-  const isKidAccount = !localOnly && !isAdmin
+  // "Kid account" is purely a UI hint — the picker, Switch button, and
+  // monitoring-mode banner are admin-only.
+  const isKidAccount = !preview && !isAdmin
 
-  // Can the current session write to the active profile? True in preview/test
-  // (writes go to localStorage) and true when the active profile is owned by
-  // the logged-in user. False when an admin is monitoring someone else.
+  // Can the current session write to the active profile? True in preview
+  // mode (writes go to localStorage) and true when the active profile is
+  // owned by the logged-in user. False when an admin is monitoring a kid.
   const canWrite =
-    localOnly ||
+    preview ||
     (!!activeProfile?.owner_id &&
       activeProfile.owner_id === session?.user?.id)
 
@@ -105,10 +86,8 @@ export default function App() {
     setRoute,
     logout,
     switchProfile,
-    enterTestMode,
     preview,
-    testMode,
-    localOnly,
+    localOnly: preview,
     isAdmin,
     isKidAccount,
     canWrite

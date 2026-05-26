@@ -399,20 +399,6 @@ input:focus {
   color: #fbbf24;
 }
 
-/* Test-mode (Dad) badge */
-.test-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  background: rgba(110, 231, 183, 0.18);
-  border: 1px solid rgba(110, 231, 183, 0.45);
-  color: #6ee7b7;
-}
-
 /* Monitoring banner (admin viewing a kid's read-only Home) */
 .monitoring {
   background: linear-gradient(

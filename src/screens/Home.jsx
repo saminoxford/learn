@@ -12,7 +12,7 @@ const SUBJECTS = [
 ]
 
 export default function Home() {
-  const { activeProfile, setRoute, switchProfile, logout, preview, testMode, localOnly, isKidAccount, canWrite } = useAppCtx()
+  const { activeProfile, setRoute, switchProfile, logout, preview, localOnly, isKidAccount, canWrite } = useAppCtx()
   const [counts, setCounts] = useState({})
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
@@ -54,7 +54,6 @@ export default function Home() {
         <div className="brand">🎓 Learn</div>
         <div className="row">
           {preview && <span className="preview-badge">Preview</span>}
-          {testMode && <span className="test-badge">Test</span>}
           {canWrite ? (
             <button
               className="profile-chip profile-chip-button"
@@ -75,7 +74,7 @@ export default function Home() {
             <button className="btn-ghost" onClick={switchProfile}>Switch</button>
           )}
           <button className="btn-ghost" onClick={logout}>
-            {preview ? 'Exit' : testMode ? 'Exit test' : 'Log out'}
+            {preview ? 'Exit' : 'Log out'}
           </button>
         </div>
       </div>
@@ -84,7 +83,7 @@ export default function Home() {
         <div className="card monitoring" style={{ marginBottom: 20 }}>
           <h2 style={{ fontSize: '1.2rem' }}>👀 Monitoring {activeProfile.name}</h2>
           <p className="muted" style={{ marginTop: 4 }}>
-            Read-only view. Use Dad mode to test the quizzes yourself.
+            Read-only view. Tap Switch to play on your own profile.
           </p>
         </div>
       )}

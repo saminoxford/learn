@@ -1,14 +1,21 @@
-// Single source of truth for how user accounts map to kid profiles.
+// Profile helpers.
+//
+// Model: every auth user has exactly one profile row in `public.profiles`
+// (enforced by the unique index profiles_owner_uniq on owner_id). Whether
+// you're an admin or a kid, you have your own row, your own XP, and your
+// own quiz history. The is_admin flag (set in auth.users.app_metadata)
+// only adds read access — admins can SELECT every profile and every
+// session in the system via the admin RLS policies. Admins cannot write
+// to other users' rows.
 //
 // HOW TO ADD A NEW KID:
-//   1. Create the user in Supabase → Authentication → Users.
-//      Set a "Display name" (e.g. "Marshall") — that becomes the profile name.
-//      If you leave it blank, the app falls back to the email's local part.
-//   2. That's it. On first login a single profile is auto-created for them
-//      and they go straight to Home. They can rename themselves and pick
-//      a new avatar from inside the app at any time.
+//   1. Create the user in Supabase → Authentication → Users. Set "Display
+//      name" to what you want their profile to be called (otherwise it
+//      falls back to the email's local part, title-cased).
+//   2. That's it. On first login a single profile is auto-created for
+//      them and they go straight to Home.
 //
-// HOW TO MAKE A USER AN ADMIN (full picker, Dad mode, sees all profiles):
+// HOW TO MAKE A USER AN ADMIN:
 //   In Supabase SQL editor:
 //     update auth.users
 //     set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb)
@@ -18,21 +25,18 @@
 
 const AVATAR_OVERRIDES = {
   Marshall: '🦅',
-  Waylon: '🐊'
+  Waylon: '🐊',
+  Sam: '👑'
 }
 
 export const FALLBACK_AVATAR = '🙂'
 
-// Emoji choices shown in the in-app avatar picker.
 export const AVATAR_OPTIONS = [
   '🦅', '🐊', '🐶', '🐱', '🦊', '🐼',
   '🐯', '🦁', '🐸', '🐢', '🐝', '🦋',
   '🐧', '🦉', '🐰', '🐨', '🦄', '🐲',
   '🚀', '🌟', '🎯', '⚽', '🎸', '👑'
 ]
-
-// Admins don't own profile rows. They read every kid's real profile via
-// the admin RLS policies (see migration `admin_read_access`).
 
 function titleCase(s) {
   if (!s) return s
@@ -48,9 +52,11 @@ export function isAdminSession(session) {
   return session?.user?.app_metadata?.is_admin === true
 }
 
-// The kid's own profile derived from their auth user, preferring fields the
-// user themselves can edit (display_name, avatar in user_metadata).
-function ownProfileFromSession(session) {
+// The profile that should be auto-created for this session if one doesn't
+// already exist. Prefers user_metadata.display_name (admin-editable in
+// Supabase dashboard, user-editable via auth.updateUser), falls back to
+// the email's local part.
+export function expectedProfileForSession(session) {
   if (!session?.user) return null
   const md = session.user.user_metadata || {}
   const name = (md.display_name || nameFromEmail(session.user.email) || '').trim()
@@ -59,35 +65,11 @@ function ownProfileFromSession(session) {
   return { name, avatar }
 }
 
-function applyAvatarOverride(row) {
+// Cosmetic-only: always render the override avatar if one exists for that
+// name, so we can tweak emoji in code without DB migrations.
+export function applyAvatarOverride(row) {
   return {
     ...row,
-    avatar: AVATAR_OVERRIDES[row.name] || row.avatar || FALLBACK_AVATAR
+    avatar: AVATAR_OVERRIDES[row?.name] || row?.avatar || FALLBACK_AVATAR
   }
-}
-
-// Profiles to insert when an account has no profile rows yet.
-// Admins don't auto-create anything — they read every kid's row directly.
-export function expectedProfilesForSession(session) {
-  if (isAdminSession(session)) return []
-  const p = ownProfileFromSession(session)
-  return p ? [p] : []
-}
-
-// Profiles to show the logged-in user. Admins see everything; non-admins
-// see exactly one row (their own), with name + avatar pulled live from
-// user_metadata so dashboard edits and in-app edits are reflected
-// immediately — even if the underlying DB row is briefly stale.
-export function visibleProfilesForSession(session, allProfiles) {
-  if (isAdminSession(session)) return allProfiles.map(applyAvatarOverride)
-  if (!allProfiles?.length) return []
-  const p = ownProfileFromSession(session)
-  const row = allProfiles[0]
-  return [
-    {
-      ...row,
-      name: p?.name ?? row.name,
-      avatar: p?.avatar ?? row.avatar ?? FALLBACK_AVATAR
-    }
-  ]
 }
