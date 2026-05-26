@@ -11,7 +11,7 @@ const SUBJECTS = [
 ]
 
 export default function Home() {
-  const { activeProfile, setRoute, switchProfile, logout, preview, testMode, localOnly } = useAppCtx()
+  const { activeProfile, setRoute, switchProfile, logout, preview, testMode, localOnly, isKidAccount } = useAppCtx()
   const [counts, setCounts] = useState({})
   const [loading, setLoading] = useState(true)
 
@@ -57,7 +57,9 @@ export default function Home() {
             <span style={{ fontSize: '1.3rem' }}>{activeProfile.avatar}</span>
             <span>{activeProfile.name}</span>
           </div>
-          <button className="btn-ghost" onClick={switchProfile}>Switch</button>
+          {!isKidAccount && (
+            <button className="btn-ghost" onClick={switchProfile}>Switch</button>
+          )}
           <button className="btn-ghost" onClick={logout}>
             {preview ? 'Exit' : testMode ? 'Exit test' : 'Log out'}
           </button>

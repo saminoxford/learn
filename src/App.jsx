@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase, envMissing } from './supabase.js'
 import { isPreviewMode, disablePreviewMode } from './previewStore.js'
 import { AppContext } from './AppContext.js'
+import { isKidEmail } from './profiles.js'
 import Login from './screens/Login.jsx'
 import ProfileSelect from './screens/ProfileSelect.jsx'
 import Home from './screens/Home.jsx'
@@ -79,6 +80,11 @@ export default function App() {
   // Bypass real Supabase writes when in either preview or test mode
   const localOnly = preview || testMode
 
+  // A "kid account" is one that's locked to a single profile and shouldn't
+  // see the picker, Switch button, or Dad mode. Preview and test sessions
+  // never count as kid accounts (they're for adults exploring the UI).
+  const isKidAccount = !localOnly && isKidEmail(session?.user?.email)
+
   const ctxValue = {
     session,
     activeProfile,
@@ -92,7 +98,8 @@ export default function App() {
     enterTestMode,
     preview,
     testMode,
-    localOnly
+    localOnly,
+    isKidAccount
   }
 
   if (envMissing && !preview) {

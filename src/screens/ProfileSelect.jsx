@@ -2,38 +2,14 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { useAppCtx } from '../AppContext.js'
 import { listProfiles as listPreviewProfiles } from '../previewStore.js'
+import { expectedProfilesForEmail, visibleProfilesForEmail } from '../profiles.js'
 
 // Change this to whatever you want. The build inlines it into the bundle, so
 // it's obscure but not a real secret — fine for keeping kids out, not banks.
 const DAD_PASSWORD = 'iamdad'
 
-// Lookup: which auth email "owns" which kid profile.
-// When marshall@stubbs.app logs in, only the Marshall profile is shown —
-// even if the underlying DB has more — so the boys can't tap into each
-// other's profile. Sam's account isn't in this map, so it sees all profiles.
-const EMAIL_TO_PROFILE = {
-  'marshall@stubbs.app': { name: 'Marshall', avatar: '🦅' },
-  'waylon@stubbs.app': { name: 'Waylon', avatar: '🐊' }
-}
-
-const DEFAULT_PROFILES = [
-  { name: 'Marshall', avatar: '🦅' },
-  { name: 'Waylon', avatar: '🐊' }
-]
-
-function expectedProfilesForEmail(email) {
-  const match = EMAIL_TO_PROFILE[(email || '').toLowerCase()]
-  return match ? [match] : DEFAULT_PROFILES
-}
-
-function visibleProfilesForEmail(email, allProfiles) {
-  const match = EMAIL_TO_PROFILE[(email || '').toLowerCase()]
-  if (!match) return allProfiles
-  return allProfiles.filter((p) => p.name === match.name)
-}
-
 export default function ProfileSelect() {
-  const { session, setActiveProfile, logout, preview, enterTestMode } = useAppCtx()
+  const { session, setActiveProfile, logout, preview, enterTestMode, isKidAccount } = useAppCtx()
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -139,9 +115,11 @@ export default function ProfileSelect() {
         <div className="brand">🎓 Learn</div>
         <div className="row">
           {preview && <span className="preview-badge">Preview</span>}
-          <button className="btn-ghost" onClick={() => setDadOpen(true)}>
-            👨 Dad
-          </button>
+          {!isKidAccount && (
+            <button className="btn-ghost" onClick={() => setDadOpen(true)}>
+              👨 Dad
+            </button>
+          )}
           <button className="btn-ghost" onClick={logout}>
             {preview ? 'Exit preview' : 'Log out'}
           </button>
