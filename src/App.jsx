@@ -150,7 +150,7 @@ export default function App() {
         screen = <Progress />
         break
       case 'article':
-        screen = <Article />
+        screen = <Article articleId={route.articleId} />
         break
       default:
         screen = <Home />

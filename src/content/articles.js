@@ -1,10 +1,10 @@
-// Fetch an article the active profile hasn't read yet, at their reading level.
-// Falls back to a random article at that level if everything's been read.
+// Helpers for fetching "Did You Know?" article rows.
 
 import { supabase } from '../supabase.js'
 
+// The next unread article at this profile's reading level. Falls back to a
+// random one at the same level if everything's been read.
 export async function fetchNextArticle(profileId, readingLevel) {
-  // Read IDs the kid has already seen
   const { data: seenRows, error: seenErr } = await supabase
     .from('sessions')
     .select('article_id')
@@ -14,7 +14,6 @@ export async function fetchNextArticle(profileId, readingLevel) {
 
   const seenIds = new Set((seenRows || []).map((r) => r.article_id))
 
-  // Pull every article at this reading level (low volume — fine to filter client-side)
   const { data: all, error: allErr } = await supabase
     .from('articles')
     .select('*')
@@ -24,8 +23,31 @@ export async function fetchNextArticle(profileId, readingLevel) {
 
   if (!all?.length) return null
 
-  // Prefer unread; if exhausted, allow any
   const unread = all.filter((a) => !seenIds.has(a.id))
   const pool = unread.length > 0 ? unread : all
   return pool[Math.floor(Math.random() * pool.length)]
+}
+
+// One article by id — used when the Home peek deep-links to a specific
+// article regardless of reading-level filter.
+export async function fetchArticleById(articleId) {
+  const { data, error } = await supabase
+    .from('articles')
+    .select('*')
+    .eq('id', articleId)
+    .maybeSingle()
+  if (error) throw error
+  return data || null
+}
+
+// The N newest articles, for the Home "Fresh reads" peek. Returns id, title,
+// reading_level, topic, created_at — lightweight columns only.
+export async function fetchLatestArticles(limit = 3) {
+  const { data, error } = await supabase
+    .from('articles')
+    .select('id, title, reading_level, topic, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data || []
 }

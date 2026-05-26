@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { useAppCtx } from '../AppContext.js'
-import { fetchNextArticle } from '../content/articles.js'
+import { fetchNextArticle, fetchArticleById } from '../content/articles.js'
 import ChoiceAnswer from '../components/ChoiceAnswer.jsx'
 import { recordSession, updateProfile } from '../previewStore.js'
 
 const READING_XP = 50 // base reward for finishing an article
 const COMPREHENSION_XP = 10 // per correct comprehension answer
 
-export default function Article() {
+export default function Article({ articleId }) {
   const { activeProfile, setRoute, updateActiveProfile, localOnly, canWrite } = useAppCtx()
 
   const [article, setArticle] = useState(null)
@@ -53,10 +53,16 @@ export default function Article() {
           }
           return
         }
-        const next = await fetchNextArticle(activeProfile.id, readingLevel)
+        const next = articleId
+          ? await fetchArticleById(articleId)
+          : await fetchNextArticle(activeProfile.id, readingLevel)
         if (cancelled) return
         if (!next) {
-          setErr('No articles available yet at your reading level. Check back soon!')
+          setErr(
+            articleId
+              ? "That article isn't available anymore."
+              : 'No articles available yet at your reading level. Check back soon!'
+          )
           setLoading(false)
           return
         }
@@ -73,7 +79,7 @@ export default function Article() {
     return () => {
       cancelled = true
     }
-  }, [activeProfile, localOnly])
+  }, [activeProfile, localOnly, articleId])
 
   if (loading) {
     return (

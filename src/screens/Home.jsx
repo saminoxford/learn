@@ -4,6 +4,9 @@ import { useAppCtx } from '../AppContext.js'
 import XPBar from '../components/XPBar.jsx'
 import EditProfile from '../components/EditProfile.jsx'
 import { listSessions as listPreviewSessions } from '../previewStore.js'
+import { fetchLatestArticles } from '../content/articles.js'
+
+const READING_LEVEL_LABEL = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th', 5: '5th' }
 
 const SUBJECTS = [
   { key: 'Math', emoji: '🔢', tone: 'math' },
@@ -22,6 +25,7 @@ export default function Home() {
   const [counts, setCounts] = useState({})
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
+  const [fresh, setFresh] = useState([])
 
   useEffect(() => {
     let cancelled = false
@@ -53,6 +57,23 @@ export default function Home() {
       cancelled = true
     }
   }, [activeProfile, localOnly])
+
+  // Fresh-reads peek: 3 newest articles, shown to everyone who can write.
+  // Skipped in preview/test where Supabase isn't being touched.
+  useEffect(() => {
+    if (localOnly) return
+    let cancelled = false
+    fetchLatestArticles(3)
+      .then((rows) => {
+        if (!cancelled) setFresh(rows)
+      })
+      .catch(() => {
+        // Silent fail — peek is non-essential.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [localOnly])
 
   return (
     <div className="app-shell">
@@ -131,6 +152,40 @@ export default function Home() {
               </div>
             </button>
           ))}
+        </div>
+      )}
+
+      {canWrite && fresh.length > 0 && (
+        <div className="fresh-reads">
+          <div className="spaced" style={{ marginBottom: 10 }}>
+            <h3 style={{ fontSize: '1.1rem', fontFamily: 'Fredoka One' }}>
+              📰 Fresh reads
+            </h3>
+            <button
+              className="btn-ghost"
+              style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+              onClick={() => setRoute({ name: 'article', subject: 'Did You Know?' })}
+            >
+              See more →
+            </button>
+          </div>
+          <div className="fresh-reads-row">
+            {fresh.map((a) => (
+              <button
+                key={a.id}
+                className="fresh-read-card"
+                onClick={() =>
+                  setRoute({ name: 'article', subject: 'Did You Know?', articleId: a.id })
+                }
+              >
+                <div className="fresh-read-meta">
+                  {READING_LEVEL_LABEL[a.reading_level] || a.reading_level} grade
+                  {a.topic ? ` · ${a.topic}` : ''}
+                </div>
+                <div className="fresh-read-title">{a.title}</div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
