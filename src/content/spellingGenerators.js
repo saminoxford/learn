@@ -1,16 +1,18 @@
 // Spelling question generators.
 //
-// 1st–2nd grade: multiple choice "Which is spelled correctly?" with
-// the correct word + 3 plausible misspellings produced by mutating
-// the word (swap adjacent letters, drop a letter, double a letter,
-// swap a vowel).
+// 1st–2nd grade: "Which is spelled correctly?" multiple choice. Correct
+// word plus 3 plausible misspellings (adjacent-swap, drop-letter,
+// double-letter, vowel-swap).
 //
-// 3rd–5th grade: typed fill-in. "Type the word that means {def}" or
-// the cloze "Type the word: {sentence}". Answer comparison is
-// case-insensitive and trimmed but otherwise strict (that's the
-// point of a spelling quiz).
+// 3rd–5th grade: meaning-based multiple choice. The kid sees a definition
+// (with an emoji visual hint), and 4 word options:
+//   - target word, spelled correctly  ← answer
+//   - target word, misspelled         (tests spelling)
+//   - antonym or other word, correctly spelled (tests meaning)
+//   - another antonym or other word, correctly spelled
+// So the kid has to know BOTH the meaning AND the spelling.
 
-import { WORDS } from './wordlists.js'
+import { WORDS, ANTONYMS } from './wordlists.js'
 
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
 const VOWELS = ['a', 'e', 'i', 'o', 'u']
@@ -36,7 +38,7 @@ function swapAdjacent(word) {
 
 function dropLetter(word) {
   if (word.length <= 2) return word + 'e'
-  const i = 1 + Math.floor(Math.random() * (word.length - 2)) // not first or last
+  const i = 1 + Math.floor(Math.random() * (word.length - 2))
   return word.slice(0, i) + word.slice(i + 1)
 }
 
@@ -58,65 +60,94 @@ function vowelSwap(word) {
 
 const MUTATORS = [swapAdjacent, dropLetter, doubleLetter, vowelSwap]
 
+function plausibleMisspelling(word) {
+  const seen = new Set([word])
+  for (let attempts = 0; attempts < 12; attempts++) {
+    const fn = MUTATORS[attempts % MUTATORS.length]
+    const candidate = fn(word)
+    if (candidate !== word && candidate.length > 0 && !seen.has(candidate)) {
+      return candidate
+    }
+  }
+  return word + 'x'
+}
+
 function plausibleMisspellings(word, n = 3) {
   const seen = new Set([word])
   const out = []
-  let attempts = 0
-  while (out.length < n && attempts < 30) {
+  for (let attempts = 0; attempts < 30 && out.length < n; attempts++) {
     const fn = MUTATORS[(out.length + attempts) % MUTATORS.length]
     const candidate = fn(word)
     if (candidate !== word && candidate.length > 0 && !seen.has(candidate)) {
       out.push(candidate)
       seen.add(candidate)
     }
-    attempts++
   }
-  // Final fallback: pad with simple variants
   while (out.length < n) {
     out.push(word + String.fromCharCode(97 + out.length))
   }
   return out
 }
 
-// ---- Choice format (1st–2nd) ----
+// ---- Antonym lookup ----
+
+function antonymOf(word) {
+  for (const [a, b] of ANTONYMS) {
+    if (a === word) return b
+    if (b === word) return a
+  }
+  return null
+}
+
+// ---- 1st-2nd grade: which spelling is correct? ----
 
 function spellChoiceQ(grade) {
   const entry = pick(WORDS[grade])
   const wrongs = plausibleMisspellings(entry.word, 3)
   return {
     type: 'choice',
-    question: 'Which is spelled correctly?',
+    question: `Which is spelled correctly?${entry.emoji ? ` ${entry.emoji}` : ''}`,
     options: shuffle([entry.word, ...wrongs]),
     answer: entry.word,
-    emoji: '🔤'
+    emoji: entry.emoji || '🔤'
   }
 }
 
-// ---- Fill format (3rd–5th) ----
+// ---- 3rd-5th grade: meaning + spelling combined MC ----
 
-function spellFillByDefinitionQ(grade) {
-  const candidates = WORDS[grade].filter((e) => e.def)
-  if (!candidates.length) return spellFillBySentenceQ(grade)
-  const entry = pick(candidates)
-  return {
-    type: 'fill',
-    question: `Spell the word that means: "${entry.def}"`,
-    answer: entry.word,
-    hint: `${entry.word.length} letters`,
-    emoji: '✍️'
+function spellMeaningQ(grade) {
+  const entry = pick(WORDS[grade])
+  const def = entry.def || 'this word'
+
+  // Build the 4 options:
+  // 1. correct word (answer)
+  // 2. misspelled version of target word
+  // 3 & 4. other words from this grade (preferring antonyms if available)
+  const misspelled = plausibleMisspelling(entry.word)
+
+  const others = []
+  const antonym = antonymOf(entry.word)
+  if (antonym && antonym !== entry.word) others.push(antonym)
+
+  // Fill remaining "other word" slots from same-grade list, avoiding the
+  // target and any already-chosen others.
+  const otherCandidates = shuffle(
+    WORDS[grade]
+      .map((e) => e.word)
+      .filter((w) => w !== entry.word && !others.includes(w))
+  )
+  while (others.length < 2 && otherCandidates.length) {
+    others.push(otherCandidates.shift())
   }
-}
 
-function spellFillBySentenceQ(grade) {
-  const candidates = WORDS[grade].filter((e) => e.sentence)
-  if (!candidates.length) return spellFillByDefinitionQ(grade)
-  const entry = pick(candidates)
+  const options = shuffle([entry.word, misspelled, ...others.slice(0, 2)])
+
   return {
-    type: 'fill',
-    question: `Type the word that fits: ${entry.sentence.replace('___', '___')}`,
+    type: 'choice',
+    question: `Which word means "${def}"?`,
+    options,
     answer: entry.word,
-    hint: `${entry.word.length} letters`,
-    emoji: '📝'
+    emoji: entry.emoji || '📖'
   }
 }
 
@@ -125,26 +156,21 @@ function spellFillBySentenceQ(grade) {
 const BUILDERS = {
   '1st Grade': [spellChoiceQ],
   '2nd Grade': [spellChoiceQ],
-  '3rd Grade': [spellFillByDefinitionQ, spellFillBySentenceQ, spellChoiceQ],
-  '4th Grade': [spellFillByDefinitionQ, spellFillBySentenceQ],
-  '5th Grade': [spellFillByDefinitionQ, spellFillBySentenceQ]
+  '3rd Grade': [spellMeaningQ],
+  '4th Grade': [spellMeaningQ],
+  '5th Grade': [spellMeaningQ]
 }
 
 export function generateSpellingQuestions(grade, n = 10) {
   const builders = BUILDERS[grade]
   if (!builders?.length || !WORDS[grade]?.length) return []
   const out = []
-  for (let i = 0; i < n; i++) {
-    const fn = builders[i % builders.length]
-    let q
-    let tries = 0
-    do {
-      q = fn(grade)
-      tries++
-    } while (
-      tries < 5 &&
-      out.some((prev) => prev.answer === q.answer && prev.question === q.question)
-    )
+  let attempts = 0
+  while (out.length < n && attempts < n * 4) {
+    const fn = builders[attempts % builders.length]
+    const q = fn(grade)
+    attempts++
+    if (out.some((prev) => prev.answer === q.answer && prev.question === q.question)) continue
     out.push(q)
   }
   return out

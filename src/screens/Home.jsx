@@ -11,7 +11,8 @@ const SUBJECTS = [
   { key: 'Geography', emoji: '🌎', tone: 'geography' },
   { key: 'Spelling', emoji: '🔤', tone: 'spelling' },
   { key: 'Reading', emoji: '📚', tone: 'reading' },
-  { key: 'Life Skills', emoji: '🧰', tone: 'lifeskills' }
+  { key: 'Life Skills', emoji: '🧰', tone: 'lifeskills' },
+  { key: 'Random', emoji: '🎲', tone: 'random' }
 ]
 
 export default function Home() {

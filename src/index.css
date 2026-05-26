@@ -225,6 +225,10 @@ input:focus {
   border-color: #fb923c;
   box-shadow: 0 18px 40px rgba(251, 146, 60, 0.25);
 }
+.tile.random:hover {
+  border-color: #ec4899;
+  box-shadow: 0 18px 40px rgba(236, 72, 153, 0.3);
+}
 
 .grade-grid {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

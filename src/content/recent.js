@@ -46,14 +46,25 @@ export function questionId(q) {
 // Given a candidate pool (array of question objects), return up to n picks
 // that prefer items not in the recent window. Records the picks in the
 // recent window for next time.
+//
+// Dedupes by stable id before picking so the same logical question can't
+// appear twice in one quiz, even if the generator yielded duplicates in
+// the oversample (common for fixed-fact templates like "largest ocean?").
 export function pickWithRecentMemory(profileId, subject, grade, candidates, n) {
   if (!candidates?.length) return []
 
+  // 1. Dedupe candidates by id (keep first occurrence)
+  const uniqueById = new Map()
+  for (const q of candidates) {
+    const id = questionId(q)
+    if (!uniqueById.has(id)) uniqueById.set(id, q)
+  }
+
+  // 2. Partition into fresh (not in recent window) and seen
   const recent = new Set(readWindow(profileId, subject, grade))
   const fresh = []
   const seen = []
-  for (const q of candidates) {
-    const id = questionId(q)
+  for (const [id, q] of uniqueById) {
     if (recent.has(id)) seen.push({ q, id })
     else fresh.push({ q, id })
   }
@@ -61,9 +72,10 @@ export function pickWithRecentMemory(profileId, subject, grade, candidates, n) {
   shuffle(fresh)
   shuffle(seen)
 
+  // 3. Pick from fresh first, fall back to seen if we run out
   const chosen = [...fresh, ...seen].slice(0, n)
 
-  // Record what we showed (append, capped to WINDOW)
+  // 4. Record what we showed (append, capped to WINDOW)
   const nextWindow = [
     ...readWindow(profileId, subject, grade),
     ...chosen.map((c) => c.id)

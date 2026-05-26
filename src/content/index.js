@@ -8,6 +8,7 @@ import { generateScienceQuestions, hasScience } from './science.js'
 import { generateSpellingQuestions, hasSpelling } from './spellingGenerators.js'
 import { generateReadingQuestions, hasReading } from './readingGenerators.js'
 import { generateLifeSkillsQuestions, hasLifeSkills } from './lifeSkills.js'
+import { generateRandomQuestions, hasRandom } from './randomMixed.js'
 import { pickWithRecentMemory } from './recent.js'
 
 // Each generator returns an array of question objects shaped like
@@ -18,7 +19,8 @@ const GENERATE = {
   Science: generateScienceQuestions,
   Spelling: generateSpellingQuestions,
   Reading: generateReadingQuestions,
-  'Life Skills': generateLifeSkillsQuestions
+  'Life Skills': generateLifeSkillsQuestions,
+  Random: generateRandomQuestions
 }
 
 const HAS = {
@@ -27,7 +29,8 @@ const HAS = {
   Science: hasScience,
   Spelling: hasSpelling,
   Reading: hasReading,
-  'Life Skills': hasLifeSkills
+  'Life Skills': hasLifeSkills,
+  Random: hasRandom
 }
 
 // Returns the next quiz's questions for this profile × subject × grade,
