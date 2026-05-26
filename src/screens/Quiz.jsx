@@ -52,7 +52,7 @@ function chime(correct) {
 }
 
 export default function Quiz({ subject, grade }) {
-  const { activeProfile, setRoute, updateActiveProfile, preview } = useAppCtx()
+  const { activeProfile, setRoute, updateActiveProfile, localOnly } = useAppCtx()
   const questions = useMemo(() => {
     const pool = BANKS[subject]?.[grade] ?? []
     return pickQuestions(pool)
@@ -122,7 +122,7 @@ export default function Quiz({ subject, grade }) {
     setSaving(true)
     const xpEarned = score * 10
     try {
-      if (preview) {
+      if (localOnly) {
         recordSession({
           user_id: activeProfile.id,
           subject,

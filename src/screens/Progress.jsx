@@ -5,7 +5,7 @@ import XPBar from '../components/XPBar.jsx'
 import { listSessions as listPreviewSessions } from '../previewStore.js'
 
 export default function Progress() {
-  const { activeProfile, setRoute, preview } = useAppCtx()
+  const { activeProfile, setRoute, localOnly } = useAppCtx()
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -14,7 +14,7 @@ export default function Progress() {
     let cancelled = false
     async function load() {
       setLoading(true)
-      if (preview) {
+      if (localOnly) {
         const rows = listPreviewSessions(activeProfile.id)
         if (!cancelled) {
           setSessions(rows)
@@ -36,7 +36,7 @@ export default function Progress() {
     return () => {
       cancelled = true
     }
-  }, [activeProfile, preview])
+  }, [activeProfile, localOnly])
 
   const totals = sessions.reduce(
     (acc, s) => {

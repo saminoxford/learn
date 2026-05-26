@@ -3,16 +3,24 @@ import { supabase } from '../supabase.js'
 import { useAppCtx } from '../AppContext.js'
 import { listProfiles as listPreviewProfiles } from '../previewStore.js'
 
+// Change this to whatever you want. The build inlines it into the bundle, so
+// it's obscure but not a real secret — fine for keeping kids out, not banks.
+const DAD_PASSWORD = 'iamdad'
+
 const DEFAULTS = [
   { name: 'Marshall', avatar: '🦅' },
   { name: 'Waylon', avatar: '🐊' }
 ]
 
 export default function ProfileSelect() {
-  const { session, setActiveProfile, logout, preview } = useAppCtx()
+  const { session, setActiveProfile, logout, preview, enterTestMode } = useAppCtx()
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
+
+  const [dadOpen, setDadOpen] = useState(false)
+  const [dadPwd, setDadPwd] = useState('')
+  const [dadErr, setDadErr] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -77,12 +85,33 @@ export default function ProfileSelect() {
     }
   }, [session, preview])
 
+  const submitDad = (e) => {
+    e?.preventDefault?.()
+    if (dadPwd === DAD_PASSWORD) {
+      setDadOpen(false)
+      setDadPwd('')
+      setDadErr('')
+      enterTestMode()
+    } else {
+      setDadErr('Wrong password.')
+    }
+  }
+
+  const cancelDad = () => {
+    setDadOpen(false)
+    setDadPwd('')
+    setDadErr('')
+  }
+
   return (
     <div className="app-shell">
       <div className="top-bar">
         <div className="brand">🎓 Learn</div>
         <div className="row">
           {preview && <span className="preview-badge">Preview</span>}
+          <button className="btn-ghost" onClick={() => setDadOpen(true)}>
+            👨 Dad
+          </button>
           <button className="btn-ghost" onClick={logout}>
             {preview ? 'Exit preview' : 'Log out'}
           </button>
@@ -108,6 +137,37 @@ export default function ProfileSelect() {
           </div>
         )}
       </div>
+
+      {dadOpen && (
+        <div className="modal-backdrop" onClick={cancelDad}>
+          <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={submitDad}>
+            <h2 style={{ fontSize: '1.4rem', marginBottom: 8 }}>Dad test mode</h2>
+            <p className="muted" style={{ marginBottom: 16 }}>
+              Quizzes won't count toward Marshall or Waylon.
+            </p>
+            <input
+              autoFocus
+              type="password"
+              placeholder="Password"
+              value={dadPwd}
+              onChange={(e) => {
+                setDadPwd(e.target.value)
+                setDadErr('')
+              }}
+              style={{ width: '100%' }}
+            />
+            {dadErr && <div className="error" style={{ marginTop: 8 }}>{dadErr}</div>}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
+              <button type="button" className="btn-ghost" onClick={cancelDad}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary">
+                Enter
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   )
 }

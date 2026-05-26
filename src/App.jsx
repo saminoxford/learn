@@ -11,6 +11,7 @@ import Results from './screens/Results.jsx'
 import Progress from './screens/Progress.jsx'
 
 const PREVIEW_SESSION = { user: { id: 'preview-user', email: 'preview@local' } }
+const DAD_PROFILE = { id: 'dad', name: 'Dad', avatar: '👨', xp: 0 }
 
 export default function App() {
   const [preview, setPreview] = useState(() => isPreviewMode())
@@ -18,6 +19,7 @@ export default function App() {
   const [sessionLoaded, setSessionLoaded] = useState(() => preview)
   const [activeProfile, setActiveProfile] = useState(null)
   const [route, setRoute] = useState({ name: 'home' })
+  const [testMode, setTestMode] = useState(false)
 
   useEffect(() => {
     if (preview) return
@@ -30,12 +32,19 @@ export default function App() {
       if (!s) {
         setActiveProfile(null)
         setRoute({ name: 'home' })
+        setTestMode(false)
       }
     })
     return () => sub.subscription.unsubscribe()
   }, [preview])
 
   const logout = async () => {
+    if (testMode) {
+      setTestMode(false)
+      setActiveProfile(null)
+      setRoute({ name: 'home' })
+      return
+    }
     if (preview) {
       disablePreviewMode()
       setPreview(false)
@@ -48,6 +57,9 @@ export default function App() {
   }
 
   const switchProfile = () => {
+    if (testMode) {
+      setTestMode(false)
+    }
     setActiveProfile(null)
     setRoute({ name: 'home' })
   }
@@ -57,6 +69,15 @@ export default function App() {
     setSession(PREVIEW_SESSION)
     setSessionLoaded(true)
   }
+
+  const enterTestMode = () => {
+    setTestMode(true)
+    setActiveProfile({ ...DAD_PROFILE })
+    setRoute({ name: 'home' })
+  }
+
+  // Bypass real Supabase writes when in either preview or test mode
+  const localOnly = preview || testMode
 
   const ctxValue = {
     session,
@@ -68,7 +89,10 @@ export default function App() {
     setRoute,
     logout,
     switchProfile,
-    preview
+    enterTestMode,
+    preview,
+    testMode,
+    localOnly
   }
 
   if (!sessionLoaded) {

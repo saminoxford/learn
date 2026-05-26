@@ -11,7 +11,7 @@ const SUBJECTS = [
 ]
 
 export default function Home() {
-  const { activeProfile, setRoute, switchProfile, logout, preview } = useAppCtx()
+  const { activeProfile, setRoute, switchProfile, logout, preview, testMode, localOnly } = useAppCtx()
   const [counts, setCounts] = useState({})
   const [loading, setLoading] = useState(true)
 
@@ -22,7 +22,7 @@ export default function Home() {
       setLoading(true)
 
       let rows = []
-      if (preview) {
+      if (localOnly) {
         rows = listPreviewSessions(activeProfile.id)
       } else {
         const { data, error } = await supabase
@@ -44,7 +44,7 @@ export default function Home() {
     return () => {
       cancelled = true
     }
-  }, [activeProfile, preview])
+  }, [activeProfile, localOnly])
 
   return (
     <div className="app-shell">
@@ -52,13 +52,14 @@ export default function Home() {
         <div className="brand">🎓 Learn</div>
         <div className="row">
           {preview && <span className="preview-badge">Preview</span>}
+          {testMode && <span className="test-badge">Test</span>}
           <div className="profile-chip">
             <span style={{ fontSize: '1.3rem' }}>{activeProfile.avatar}</span>
             <span>{activeProfile.name}</span>
           </div>
           <button className="btn-ghost" onClick={switchProfile}>Switch</button>
           <button className="btn-ghost" onClick={logout}>
-            {preview ? 'Exit' : 'Log out'}
+            {preview ? 'Exit' : testMode ? 'Exit test' : 'Log out'}
           </button>
         </div>
       </div>
