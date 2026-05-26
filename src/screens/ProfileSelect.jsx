@@ -7,10 +7,30 @@ import { listProfiles as listPreviewProfiles } from '../previewStore.js'
 // it's obscure but not a real secret — fine for keeping kids out, not banks.
 const DAD_PASSWORD = 'iamdad'
 
-const DEFAULTS = [
+// Lookup: which auth email "owns" which kid profile.
+// When marshall@stubbs.app logs in, only the Marshall profile is shown —
+// even if the underlying DB has more — so the boys can't tap into each
+// other's profile. Sam's account isn't in this map, so it sees all profiles.
+const EMAIL_TO_PROFILE = {
+  'marshall@stubbs.app': { name: 'Marshall', avatar: '🦅' },
+  'waylon@stubbs.app': { name: 'Waylon', avatar: '🐊' }
+}
+
+const DEFAULT_PROFILES = [
   { name: 'Marshall', avatar: '🦅' },
   { name: 'Waylon', avatar: '🐊' }
 ]
+
+function expectedProfilesForEmail(email) {
+  const match = EMAIL_TO_PROFILE[(email || '').toLowerCase()]
+  return match ? [match] : DEFAULT_PROFILES
+}
+
+function visibleProfilesForEmail(email, allProfiles) {
+  const match = EMAIL_TO_PROFILE[(email || '').toLowerCase()]
+  if (!match) return allProfiles
+  return allProfiles.filter((p) => p.name === match.name)
+}
 
 export default function ProfileSelect() {
   const { session, setActiveProfile, logout, preview, enterTestMode } = useAppCtx()
@@ -21,6 +41,8 @@ export default function ProfileSelect() {
   const [dadOpen, setDadOpen] = useState(false)
   const [dadPwd, setDadPwd] = useState('')
   const [dadErr, setDadErr] = useState('')
+
+  const email = session?.user?.email
 
   useEffect(() => {
     let cancelled = false
@@ -55,7 +77,7 @@ export default function ProfileSelect() {
 
       let rows = existing ?? []
       if (rows.length === 0) {
-        const toInsert = DEFAULTS.map((d) => ({
+        const toInsert = expectedProfilesForEmail(email).map((d) => ({
           owner_id: userId,
           name: d.name,
           avatar: d.avatar,
@@ -83,7 +105,15 @@ export default function ProfileSelect() {
     return () => {
       cancelled = true
     }
-  }, [session, preview])
+  }, [session, preview, email])
+
+  // Auto-select when only one visible profile (boys skip the picker entirely)
+  const visible = preview ? profiles : visibleProfilesForEmail(email, profiles)
+  useEffect(() => {
+    if (!loading && visible.length === 1) {
+      setActiveProfile(visible[0])
+    }
+  }, [loading, visible, setActiveProfile])
 
   const submitDad = (e) => {
     e?.preventDefault?.()
@@ -121,9 +151,12 @@ export default function ProfileSelect() {
         <h1 style={{ fontSize: '2.4rem', textAlign: 'center' }}>Who's learning today?</h1>
         {loading && <p className="muted">Loading profiles…</p>}
         {err && <p className="error">{err}</p>}
-        {!loading && !err && (
+        {!loading && !err && visible.length === 0 && (
+          <p className="muted">No profile found for {email}. Tell Dad.</p>
+        )}
+        {!loading && !err && visible.length > 1 && (
           <div className="grid profile-grid" style={{ width: '100%' }}>
-            {profiles.map((p) => (
+            {visible.map((p) => (
               <button
                 key={p.id}
                 className="tile"
