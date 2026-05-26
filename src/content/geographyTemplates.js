@@ -145,6 +145,159 @@ function landmarkQ() {
   return choice(`Where is the ${l.name}?`, l.country, distractors, '🏛️')
 }
 
+// ---- Practical geography: place hierarchy, addresses, navigation ----
+//
+// These help kids understand the real-world stack a mailing address rides
+// on (country → state → county → city → street → house number) and the
+// vocabulary they need to ask for or give directions.
+
+const GEO_LEVELS = ['Country', 'State', 'County', 'City', 'Street', 'Address']
+
+const SAMPLE_ADDRESSES = [
+  {
+    full: '123 Maple Street, Oxford, MS 38655',
+    house: '123',
+    street: 'Maple Street',
+    city: 'Oxford',
+    state: 'MS',
+    zip: '38655'
+  },
+  {
+    full: '4500 Pine Road, Jackson, MS 39201',
+    house: '4500',
+    street: 'Pine Road',
+    city: 'Jackson',
+    state: 'MS',
+    zip: '39201'
+  },
+  {
+    full: '88 Oak Avenue, Memphis, TN 38103',
+    house: '88',
+    street: 'Oak Avenue',
+    city: 'Memphis',
+    state: 'TN',
+    zip: '38103'
+  }
+]
+
+// Pick a random ordered pair (bigger, smaller) from GEO_LEVELS for the
+// hierarchy question. Returns nulls if the random pick somehow collides
+// — the wrapper retries.
+function pickHierarchyPair() {
+  const i = Math.floor(Math.random() * GEO_LEVELS.length)
+  let j = Math.floor(Math.random() * GEO_LEVELS.length)
+  if (i === j) j = (j + 1) % GEO_LEVELS.length
+  const [bigger, smaller] = i < j ? [GEO_LEVELS[i], GEO_LEVELS[j]] : [GEO_LEVELS[j], GEO_LEVELS[i]]
+  return { bigger, smaller }
+}
+
+function hierarchyBiggerQ() {
+  const { bigger, smaller } = pickHierarchyPair()
+  const distractors = GEO_LEVELS.filter((g) => g !== bigger && g !== smaller).slice(0, 3)
+  return choice(
+    `Which is bigger: a ${smaller.toLowerCase()} or a ${bigger.toLowerCase()}?`,
+    bigger,
+    [smaller, ...distractors],
+    '🗺️'
+  )
+}
+
+function hierarchyContainsQ() {
+  // "A city is part of a…" → State (one step up)
+  const i = 1 + Math.floor(Math.random() * (GEO_LEVELS.length - 1))
+  const item = GEO_LEVELS[i]
+  const parent = GEO_LEVELS[i - 1]
+  const distractors = GEO_LEVELS.filter((g) => g !== item && g !== parent).slice(0, 3)
+  return choice(
+    `A ${item.toLowerCase()} is part of a…`,
+    parent,
+    distractors,
+    '🧭'
+  )
+}
+
+function placeIsAQ() {
+  // Concrete examples kids recognize, mapped to their level in the hierarchy.
+  const examples = [
+    { name: 'Mississippi', level: 'State' },
+    { name: 'Texas', level: 'State' },
+    { name: 'Lafayette', level: 'County' },
+    { name: 'Oxford', level: 'City' },
+    { name: 'Memphis', level: 'City' },
+    { name: 'United States', level: 'Country' },
+    { name: 'Mexico', level: 'Country' },
+    { name: 'Maple Street', level: 'Street' }
+  ]
+  const ex = pick(examples)
+  const distractors = GEO_LEVELS.filter((g) => g !== ex.level).slice(0, 3)
+  return choice(
+    `${ex.name} is a…`,
+    ex.level,
+    distractors,
+    '📍'
+  )
+}
+
+// ---- Address anatomy ----
+function addressPartQ() {
+  const addr = pick(SAMPLE_ADDRESSES)
+  const parts = [
+    { label: 'house number', value: addr.house },
+    { label: 'street name', value: addr.street },
+    { label: 'city', value: addr.city },
+    { label: 'state', value: addr.state },
+    { label: 'ZIP code', value: addr.zip }
+  ]
+  const target = pick(parts)
+  const distractors = parts
+    .filter((p) => p.value !== target.value)
+    .map((p) => p.value)
+  return choice(
+    `In the address "${addr.full}", which part is the ${target.label}?`,
+    target.value,
+    distractors,
+    '✉️'
+  )
+}
+
+// ---- Navigation language ----
+function emergencyNumberQ() {
+  return choice(
+    'What 3-digit number do you call for emergencies in the U.S.?',
+    '911',
+    ['411', '311', '811'],
+    '🚨'
+  )
+}
+
+function directionsOrderQ() {
+  // The "biggest first / smallest last" convention people use to find a place.
+  return choice(
+    "If you're telling someone where you live, which order makes it easiest to find?",
+    'Street, city, state',
+    ['State, street, city', 'City, street, state', 'Street, state, city'],
+    '🧭'
+  )
+}
+
+function whyStateMattersQ() {
+  return choice(
+    'There are towns called "Oxford" in Mississippi AND in England. To know which one, you also need to say the…',
+    'State or country',
+    ['Street', 'House number', 'ZIP code'],
+    '🌎'
+  )
+}
+
+function whatGoesOnEnvelopeQ() {
+  return choice(
+    'When you mail a letter, the address on the envelope MUST include the…',
+    'City, state, and ZIP code',
+    ['Phone number', 'Email address', 'House color'],
+    '✉️'
+  )
+}
+
 // ---- Per-grade template registries ----
 // 1st grade: just continents + oceans + a tiny set of well-known states
 const SIMPLE_STATES = US_STATES.filter((s) =>
@@ -157,13 +310,18 @@ const g1 = [
   largestOceanQ,
   smallestOceanQ,
   equatorQ,
-  () => compassQ()
+  () => compassQ(),
+  emergencyNumberQ,
+  hierarchyBiggerQ,
+  placeIsAQ
 ]
 
 const g2 = [
   ...g1,
   () => stateCapitalQ(SIMPLE_STATES),
-  () => countryContinentQ()
+  () => countryContinentQ(),
+  hierarchyContainsQ,
+  addressPartQ
 ]
 
 // 3rd grade: well-known states + most countries + compass
@@ -185,7 +343,13 @@ const g3 = [
   largestOceanQ,
   smallestOceanQ,
   howManyContinentsQ,
-  () => regionQ(POPULAR_STATES)
+  () => regionQ(POPULAR_STATES),
+  hierarchyBiggerQ,
+  hierarchyContainsQ,
+  placeIsAQ,
+  addressPartQ,
+  emergencyNumberQ,
+  directionsOrderQ
 ]
 
 const g4 = [
@@ -196,7 +360,14 @@ const g4 = [
   () => compassQ(),
   () => regionQ(US_STATES),
   () => landmarkQ(),
-  largestOceanQ
+  largestOceanQ,
+  hierarchyBiggerQ,
+  hierarchyContainsQ,
+  placeIsAQ,
+  addressPartQ,
+  directionsOrderQ,
+  whyStateMattersQ,
+  whatGoesOnEnvelopeQ
 ]
 
 const g5 = [
@@ -207,7 +378,13 @@ const g5 = [
   () => regionQ(US_STATES),
   () => landmarkQ(),
   () => compassQ(),
-  smallestOceanQ
+  smallestOceanQ,
+  hierarchyContainsQ,
+  placeIsAQ,
+  addressPartQ,
+  directionsOrderQ,
+  whyStateMattersQ,
+  whatGoesOnEnvelopeQ
 ]
 
 const GENERATORS = {
