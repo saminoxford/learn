@@ -5,6 +5,9 @@ import XPBar from '../components/XPBar.jsx'
 import EditProfile from '../components/EditProfile.jsx'
 import { listSessions as listPreviewSessions } from '../previewStore.js'
 import { fetchLatestArticles } from '../content/articles.js'
+import { countFailedQuestions } from '../content/questionHistory.js'
+
+const REVIEW_TILE_THRESHOLD = 5
 
 const READING_LEVEL_LABEL = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th', 5: '5th' }
 
@@ -27,6 +30,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
   const [fresh, setFresh] = useState([])
+  const [reviewCount, setReviewCount] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -75,6 +79,23 @@ export default function Home() {
       cancelled = true
     }
   }, [localOnly])
+
+  // Count outstanding failed questions to gate the Review tile. Hidden in
+  // preview mode (no DB-backed history there).
+  useEffect(() => {
+    if (localOnly || !activeProfile) return
+    let cancelled = false
+    countFailedQuestions(activeProfile.id)
+      .then((n) => {
+        if (!cancelled) setReviewCount(n)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [activeProfile, localOnly])
+
+  const showReviewTile = !localOnly && reviewCount >= REVIEW_TILE_THRESHOLD
 
   return (
     <div className="app-shell">
@@ -134,6 +155,17 @@ export default function Home() {
 
       {canWrite && (
         <div className="grid subject-grid">
+          {showReviewTile && (
+            <button
+              key="Review"
+              className="tile review"
+              onClick={() => setRoute({ name: 'review' })}
+            >
+              <div className="emoji">🎯</div>
+              <h2>Review</h2>
+              <div className="sub">{reviewCount} to review</div>
+            </button>
+          )}
           {SUBJECTS.map((s) => (
             <button
               key={s.key}

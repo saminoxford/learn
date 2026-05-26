@@ -10,6 +10,7 @@ import Quiz from './screens/Quiz.jsx'
 import Results from './screens/Results.jsx'
 import Progress from './screens/Progress.jsx'
 import Article from './screens/Article.jsx'
+import Review from './screens/Review.jsx'
 
 const PREVIEW_SESSION = { user: { id: 'preview-user', email: 'preview@local' } }
 
@@ -151,6 +152,9 @@ export default function App() {
         break
       case 'article':
         screen = <Article articleId={route.articleId} />
+        break
+      case 'review':
+        screen = <Review />
         break
       default:
         screen = <Home />
